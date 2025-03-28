@@ -1,5 +1,2 @@
 Flask
 Werkzeug
-Jinja2
-itsdangerous
-click
