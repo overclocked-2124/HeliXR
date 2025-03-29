@@ -1,0 +1,37 @@
+* {
+    background-color: #151019;
+    color: #FFFFFF;
+}
+
+body{
+    margin: 0px 0px;
+}
+
+header{
+    margin: 40px 50px;
+    display: flex;
+}
+
+.logo{
+    font-family: "Orbitron", sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    font-style: normal;
+    border-right: 1px solid #FFFFFF; 
+    padding: 0px 15px; 
+}
+
+.logo .highlight{
+    font-weight: 700;
+    color: #EC4E20;
+    display: inline-block;
+}
+
+.logo-title{
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    font-weight: 100;
+    font-style: normal;
+    align-self: center;
+    padding-left: 15px;
+}
