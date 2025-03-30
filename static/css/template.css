@@ -9,15 +9,20 @@ html, body {
 
 body{
     margin: 0px 0px;
-    padding: 0px 0px;
+    padding-top: 10vh;
 }
 
 header{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 95%;
     height: 10%;
-    margin: 0px 3%;
+    margin-left: 3%;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    z-index: 1000;
 }
 
 .logo-container{
@@ -32,6 +37,7 @@ header{
     font-style: normal;
     border-right: 1px solid #FFFFFF; 
     padding-right: 15px; 
+    background-color: transparent !important;
 }
 
 .logo .highlight{
@@ -46,11 +52,14 @@ header{
     font-weight: 400;
     font-style: normal;
     padding-left: 15px;
+    
 }
 
 .nav-list a{
     text-decoration: none;
+    
 }
+
 
 .nav-list{
     font-size: 14px;
@@ -76,7 +85,7 @@ header{
 }
 
 .signup:hover{
-    background-color: #EC4E20;
+    background-color: #E6AD9E;
 }
 
 footer{
