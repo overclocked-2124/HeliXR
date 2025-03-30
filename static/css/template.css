@@ -13,7 +13,7 @@ body{
 
 header{
     height: 5%;
-    margin: 20px 30px;
+    margin: 20px 3%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -30,7 +30,7 @@ header{
     font-weight: 500;
     font-style: normal;
     border-right: 1px solid #FFFFFF; 
-    padding: 0px 15px; 
+    padding-right: 15px; 
 }
 
 .logo .highlight{
