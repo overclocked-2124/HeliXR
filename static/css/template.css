@@ -3,11 +3,16 @@
     color: #FFFFFF;
 }
 
+html, body {
+    height: 100%;
+  }
+
 body{
     margin: 0px 0px;
 }
 
 header{
+    height: 5%;
     margin: 20px 30px;
     display: flex;
     align-items: center;
@@ -95,8 +100,4 @@ footer .footer-container .credit{
 
 footer .footer-container a{
     text-decoration: none;
-    font-family: "Space Grotesk", sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    font-style: normal;
 }
