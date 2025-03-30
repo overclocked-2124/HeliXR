@@ -9,11 +9,12 @@ html, body {
 
 body{
     margin: 0px 0px;
+    padding: 0px 0px;
 }
 
 header{
-    height: 5%;
-    margin: 20px 3%;
+    height: 10%;
+    margin: 0px 3%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -78,6 +79,11 @@ header{
     background-color: #EC4E20;
 }
 
+footer{
+    height: 6vh;
+    margin-bottom: 4rem;
+}
+
 footer hr{
     width: 94%;
     border-radius: 5px;
@@ -87,9 +93,9 @@ footer hr{
 footer .footer-container{
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin: 1rem 3%;
 }
-
 footer .footer-container .credit{
     font-family: "Space Grotesk", sans-serif;
     font-size: 14px;
