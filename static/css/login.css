@@ -1,0 +1,148 @@
+.register-page {
+    height: 80vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #151019;
+}
+
+.form-container {
+    width: 100%;
+    max-width: 450px;
+    padding: 35px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background-color: #1d1a24;
+}
+
+.form-title, .form-label, .form-footer, .form-errors, .form-action {
+    background-color: #1d1a24;
+}
+
+.form-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 500;
+    font-size: 32px;
+    margin-bottom: 12px;
+    color: #FFFFFF;
+    text-align: center;
+    background-color: #1d1a24;
+}
+
+.register-form {
+    background-color: #1d1a24;
+}
+
+.form-group {
+    padding-bottom: 20px;
+    background-color: #1d1a24;
+}
+
+.form-label {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #FFFFFF;
+    background-color: #1d1a24;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px 15px;
+    border-radius: 5px;
+    border: 1px solid #333;
+    background-color: #151019;
+    color: #FFFFFF;
+    font-family: "Roboto", sans-serif;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #DB8A74;
+}
+
+.form-errors {
+    margin-top: 5px;
+    color: #EC4E20;
+    font-family: "Roboto", sans-serif;
+    font-size: 12px;
+}
+
+.form-check {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    background-color: #1d1a24;
+}
+
+.form-check-input {
+    margin-right: 8px;
+    cursor: pointer;
+    background-color: #151019;
+    border: 1px solid #333;
+}
+
+.form-check-label {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    color: #FFFFFF;
+    cursor: pointer;
+}
+
+.submit-btn {
+    font-family: "Russo One", sans-serif;
+    width: 100%;
+    font-size: 16px;
+    background-color: #DB8A74;
+    color: #151019;
+    border: none;
+    border-radius: 5px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.submit-btn:hover {
+    background-color: #E6AD9E;
+}
+
+.text-muted {
+    display: block;
+    text-align: center;
+    margin-top: 18px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    color: #7A7A7A;
+    background-color: #1d1a24;
+}
+
+.text-muted a {
+    color: #DB8A74;
+    text-decoration: none;
+    background-color: #1d1a24;
+}
+
+.text-muted a:hover {
+    text-decoration: underline;
+}
+
+.form-footer {
+    padding-top: 20px;
+    text-align: center;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    color: #7A7A7A;
+    background-color: #1d1a24;
+}
+
+.login-link {
+    color: #DB8A74;
+    text-decoration: none;
+    background-color: #1d1a24;
+}
+
+.login-link:hover {
+    text-decoration: underline;
+}
