@@ -131,7 +131,7 @@ footer .footer-container a{
     text-align: center;
 }
 
-.failure {
+.danger {
     width: 20%;
     background-color: #f8d7da; 
     color: #721c24; 
