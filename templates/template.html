@@ -29,11 +29,20 @@
                 <a href="#">What</a>
                 <a href="#">How</a>
                 <a href="#">Why</a>
-                <a href="#" class = "signup">Sign Up</a>
+                <a href="{{url_for('register')}}" class = "signup">Sign Up</a>
             </ul>
         </nav>
     </header>
     <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {%if messages%}
+                {%for category, message in messages%}
+                <div class="{{category}}">
+                    {{message}}
+                </div>
+                {%endfor%}
+            {%endif%}
+        {%endwith%}
         {% block content %}
         
         {% endblock %}
