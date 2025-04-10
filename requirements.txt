@@ -2,3 +2,4 @@ Flask
 Werkzeug
 flask-wtf
 email_validator
+flask-sqlalchemy
