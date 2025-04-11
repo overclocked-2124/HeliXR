@@ -6,11 +6,12 @@ import email_validator
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'c1877bdc3305c942f87b10f86e246167'
-app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///site.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+
 
 db = SQLAlchemy(app)
 
-class User(db.model):
+class User(db.Model):
     id = db.Column(db.Integer,primary_key=True)
     username = db.Column(db.String(20), unique=True,nullable=False)
     email = db.Column(db.String(120), unique=True,nullable=False)
@@ -18,7 +19,9 @@ class User(db.model):
     password = db.Column(db.String(60), nullable=False)
 
     def __repr__(self):
-        return f"User('{self.username}' ,'{self.username}', '{self.image_file}')"
+        return f"User('{self.username}' ,'{self.email}', '{self.image_file}')"
+
+
 
 
 
@@ -45,8 +48,6 @@ def login():
             else:
                 flash('Login Unsuccessful. Please check username and password', 'danger')
     return render_template('login.html', title="HELIXR-Login", css_path="login", form=form)
-
-p
 
 if __name__ == '__main__':
     app.run(debug=True)
