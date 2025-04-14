@@ -1,5 +1,5 @@
 from flask import request, render_template,url_for,flash, redirect
-from HeliXR import app
+from HeliXR import app , db ,bcrypt
 from HeliXR.forms import RegistrationForm, LoginForm
 from HeliXR.models import User
 import email_validator
@@ -12,8 +12,12 @@ def home():
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
-        flash(f'Account created for {form.username.data}!','success')
-        return redirect(url_for('home'))
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        user = User(username=form.username.data,email=form.email.data,password=hashed_password)
+        db.session.add(user)
+        db.session.commit()
+        flash('Your account has been created! You are now able to log in','success')
+        return redirect(url_for('login'))
     return render_template('register.html',title="HELIXR-Register",css_path="register",form = form)
 
 @app.route('/login', methods=['GET', 'POST'])
