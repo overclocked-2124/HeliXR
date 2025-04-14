@@ -1,0 +1,149 @@
+* {
+    background-color: #151019;
+    color: #FFFFFF;
+}
+
+html, body {
+    height: 100%;
+  }
+
+body{
+    margin: 0px 0px;
+    padding-top: 10vh;
+}
+
+header{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 95%;
+    height: 10%;
+    margin-left: 3%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000;
+}
+
+.logo-container{
+    display: flex;
+    align-items: center;
+}
+
+.logo{
+    font-family: "Orbitron", sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    font-style: normal;
+    border-right: 1px solid #FFFFFF; 
+    padding-right: 15px; 
+    background-color: transparent !important;
+}
+
+.logo .highlight{
+    font-weight: 900;
+    color: #EC4E20;
+    display: inline-block;
+}
+
+.logo-title{
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    font-style: normal;
+    padding-left: 15px;
+    
+}
+
+.nav-list a{
+    text-decoration: none;
+    
+}
+
+
+.nav-list{
+    font-size: 14px;
+    font-weight: 400;
+    font-style: normal;
+    font-family: "Space Grotesk", sans-serif;
+    display: flex;
+    gap: 2rem;
+    flex-direction: row;
+    align-items: center;
+}
+
+.signup{
+    font-family: "Russo One", sans-serif;
+    display: inline-block;
+    font-size: 16px;
+    background-color: #DB8A74;
+    color: #151019;
+    border-radius: 5px;
+    padding: 6px 12px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.signup:hover{
+    background-color: #E6AD9E;
+}
+
+footer{
+    height: 6vh;
+    margin-bottom: 4rem;
+}
+
+footer hr{
+    width: 94%;
+    border-radius: 5px;
+
+}
+
+footer .footer-container{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1rem 3%;
+}
+footer .footer-container .credit{
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    font-style: normal;
+    
+}
+
+footer .footer-container a{
+    text-decoration: none;
+}
+
+.success {
+    width: 20%;
+    background-color: #d4edda; 
+    color: #155724; 
+    border: 1px solid #c3e6cb; 
+    padding: 10px; 
+    margin: 10px 40%; 
+    border-radius: 5px; 
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    text-align: center;
+}
+
+.danger {
+    width: 20%;
+    background-color: #f8d7da; 
+    color: #721c24; 
+    border: 1px solid #f5c6cb; 
+    padding: 10px; 
+    margin: 10px 40%; 
+    border-radius: 5px; 
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    text-align: center; 
+}
+
+    
+    
