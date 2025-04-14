@@ -1,16 +1,8 @@
-from flask import Flask, jsonify, request, render_template,url_for,flash, redirect
-from flask_sqlalchemy import SQLAlchemy
-from forms import RegistrationForm, LoginForm
+from flask import request, render_template,url_for,flash, redirect
+from HeliXR import app
+from HeliXR.forms import RegistrationForm, LoginForm
+from HeliXR.models import User
 import email_validator
-from models import User
-
-app = Flask(__name__)
-
-app.config['SECRET_KEY'] = 'c1877bdc3305c942f87b10f86e246167'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-
-
-db = SQLAlchemy(app)
 
 @app.route('/')
 def home():
@@ -35,6 +27,3 @@ def login():
             else:
                 flash('Login Unsuccessful. Please check username and password', 'danger')
     return render_template('login.html', title="HELIXR-Login", css_path="login", form=form)
-
-if __name__ == '__main__':
-    app.run(debug=True)
