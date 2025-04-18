@@ -14,4 +14,3 @@ torch
 requests
 numpy
 scikit-learn
-pyPDF2
