@@ -5,3 +5,12 @@ email_validator
 flask-sqlalchemy
 flask-bcrypt
 flask-login
+streamlit
+pandas
+gTTS
+joblib
+faster-whisper
+torch
+requests
+numpy
+scikit-learn
