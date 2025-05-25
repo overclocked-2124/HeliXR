@@ -29,7 +29,7 @@ def login():
             user = User.query.filter_by(email=form.email.data).first()
             if user and bcrypt.check_password_hash(user.password, form.password.data):
                 login_user(user,remember=form.remember.data)
-                return redirect(url_for('home'))
+                return redirect(url_for('dashboard_analytics'))
             else:
                 flash('Login Unsuccessful. Please check email and password', 'danger')
     return render_template('login.html', title="HELIXR-Login", css_path="login", form=form)
@@ -39,3 +39,20 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('home'))
+
+
+@app.route('/dashboard_analytics')
+def dashboard_analytics():
+    return render_template('dashboard_analytics.html',title="HELIXR Analytics",css_path="dashboard_analytics")
+
+@app.route('/dashboard_ai_agent')
+def dashboard_ai_agent():
+    return render_template('dashboard_ai_agent.html',title="HELIXR Analytics",css_path="dashboard_ai_agent")
+
+@app.route('/dashboard_command')
+def dashboard_command():
+    return render_template('dashboard_command.html',title="HELIXR Analytics",css_path="dashboard_command")
+
+@app.route('/dashboard_visual')
+def dashboard_visual():
+    return render_template('dashboard_visual.html',title="HELIXR Analytics",css_path="dashboard_visual")

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        {% if title%}
+        <title>{{ title }}</title>
+        {% else %}
+        <title>HeliXR</title>
+        {% endif%}
+        {% if css_path %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/' + css_path + '.css') }}">
+        {% endif %}
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Roboto:ital,wdth,wght@0,75..100,100..900;1,75..100,100..900&family=Russo+One&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_template.css') }}">
+    </head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                Heli<span class="highlight">XR</span>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li {% if active_page == 'analytics' %}style="border: 2px solid #EC4E20; border-radius: 7px;"{% endif %}><a href="dashboard_analytics">Analytics</a></li>
+                    <li {% if active_page == 'visual_oversight' %}style="border: 2px solid #EC4E20; border-radius: 7px;"{% endif %}><a href="dashboard_visual">Visual oversight</a></li>
+                    <li {% if active_page == 'ai_agent' %}style="border: 2px solid #EC4E20; border-radius: 7px;"{% endif %}><a href="dashboard_ai_agent">AI agent</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-actions">
+                <a href="dashboard_command" class="command-view-button" {% if active_page == 'command_view' %}style="border: 3px solid #EC4E20; border-radius: 25px;"{% endif %}>Command view</a>
+                <div class="sidebar-footer">
+                    Efficiency Visualized
+                </div>
+                <a href="logout" class="logout-button">Logout</a>
+            </div>
+        </aside>
+        <main class="main-content">
+            {% block main_dashboard_content %}
+            <div class="video-placeholder">
+                MAIN AREA
+            </div>
+            {% endblock main_dashboard_content %}
+        </main>
+    </div>
+</body>
+</html>
