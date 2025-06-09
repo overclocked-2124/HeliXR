@@ -1,142 +1,48 @@
-import streamlit as st
-import pandas as pd
-import joblib  # For loading ML model
-from gtts import gTTS
 import os
-import tempfile
-import torch
-from faster_whisper import WhisperModel
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
-import av
-import queue
-import numpy as np
+import signal
+import sys
 
+from elevenlabs.client import ElevenLabs
+from elevenlabs.conversational_ai.conversation import Conversation
+from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
-# Load Machine Data from CSV
-def load_machine_data(csv_file):
-    try:
-        return pd.read_csv(csv_file)
-    except Exception as e:
-        return None
-
-data_file = "../ML/dummy_valve_data.csv"  # Updated for new model
-data = load_machine_data(data_file)
-
-# Load ML Model for Valve Control
-ml_model = joblib.load("../ML/valve_model.pkl")  # Updated model file
-
-def check_machine_fault(features):
-    prediction = ml_model.predict([features])
-    return int(prediction[0])  # 0 = Close Valve, 1 = Open Valve
-
-# Speech-to-Text using faster-whisper (local model)
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.q = queue.Queue()
-
-    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-        audio = frame.to_ndarray().flatten().astype(np.float32) / 32768.0
-        self.q.put(audio)
-        return frame
-
-def recognize_speech_live():
-    st.write("🎙️ Speak now...")
-    ctx = webrtc_streamer(
-        key="stt",
-        mode="sendonly",
-        audio_processor_factory=AudioProcessor,
-        media_stream_constraints={"audio": True, "video": False}
-    )
-
-    if ctx.audio_processor:
-        audio_chunks = []
+# Custom subclass to safely handle audio stop errors
+class SafeAudioInterface(DefaultAudioInterface):
+    def stop(self):
         try:
-            while True:
-                chunk = ctx.audio_processor.q.get(timeout=5)
-                audio_chunks.append(chunk)
-        except queue.Empty:
-            pass
+            super().stop()
+        except OSError as e:
+            print(f"Warning: Audio stop failed due to: {e}")
 
-        if audio_chunks:
-            full_audio = np.concatenate(audio_chunks)
-            # Save temp WAV file
-            from scipy.io.wavfile import write
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-                write(f.name, 16000, full_audio)
-                tmp_path = f.name
+def main():
+    AGENT_ID = 'agent_01jx4j8n0zfz68zktdrrwc5gde'
+    API_KEY = 'sk_a4c62b275a604109c2373a2efc0d11897274c9eda962a7d9'
 
-            # Run Whisper
-            model_size = "base"
-            model = WhisperModel(model_size, device="cuda" if torch.cuda.is_available() else "cpu", compute_type="int8")
-            segments, _ = model.transcribe(tmp_path, beam_size=5)
-            full_text = " ".join([segment.text for segment in segments])
-            return full_text
-    return ""
+    if not AGENT_ID:
+        sys.stderr.write("AGENT_ID environment variable must be set\n")
+        sys.exit(1)
+    
+    if not API_KEY:
+        sys.stderr.write("ELEVENLABS_API_KEY not set, assuming the agent is public\n")
 
+    client = ElevenLabs(api_key=API_KEY)
+    conversation = Conversation(
+        client,
+        AGENT_ID,
+        requires_auth=bool(API_KEY),
+        audio_interface=SafeAudioInterface(),  # Use the safe subclass
+        callback_agent_response=lambda response: print(f"Agent: {response}"),
+        callback_agent_response_correction=lambda original, corrected: print(f"Agent: {original} -> {corrected}"),
+        callback_user_transcript=lambda transcript: print(f"User: {transcript}"),
+        # callback_latency_measurement=lambda latency: print(f"Latency: {latency}ms"),
+    )
+    conversation.start_session()
 
-# AI Response using Ollama
-import requests
+    # Run until Ctrl+C is pressed.
+    signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
 
-def get_ai_response(query):
-    try:
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "llama3", "prompt": query},
-            stream=False
-        )
-        if response.status_code == 200:
-            return response.json().get("response", "No response.")
-        else:
-            return "Ollama request failed."
-    except Exception as e:
-        return f"Ollama error: {e}"
+    conversation_id = conversation.wait_for_session_end()
+    print(f"Conversation ID: {conversation_id}")
 
-# Text-to-Speech using gTTS
-def speak(text):
-    try:
-        tts = gTTS(text)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
-            tts.save(tmp.name)
-            st.audio(tmp.name)
-    except Exception as e:
-        st.write("Error in TTS: ", e)
-
-# Process User Query with Specific Commands
-def process_query(query):
-    query = query.lower()
-
-    if "status report" in query:
-        return "System is online. Monitoring machines."
-    elif "latest data" in query:
-        if data is not None:
-            return data.iloc[-1].to_string()
-    elif "check valve" in query:
-        if data is not None:
-            latest = data.iloc[-1]
-            features = latest[['pH', 'Temperature', 'Red', 'Green', 'Blue', 'Liquid_Level',
-                               'Max_Level', 'is_neutral_ph', 'is_optimal_temp',
-                               'color_intensity', 'level_ratio']].tolist()
-            valve_status = check_machine_fault(features)
-            return "Valve should remain OPEN." if valve_status == 1 else "Valve should be CLOSED to maintain quality."
-
-    if data is not None:
-        for column in data.columns:
-            if column.lower() in query:
-                return f"The latest {column} is {data[column].iloc[-1]}"
-
-    return get_ai_response(query)
-
-# Streamlit UI
-st.title("AI Voice Assistant for Machine Monitoring")
-
-if st.button("Start Listening"):
-    user_query = recognize_speech_live()
-
-    if user_query:
-        st.write(f"You said: {user_query}")
-        response = process_query(user_query)
-        st.write(f"Response: {response}")
-        speak(response)
-    else:
-        st.write("Please upload an audio file.")
+if __name__ == '__main__':
+    main()
