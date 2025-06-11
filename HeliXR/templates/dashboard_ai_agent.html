@@ -2,12 +2,46 @@
 
 {% set active_page = 'ai_agent' %}
 
-{% block page_title %}
-<title>HeliXR - AI Agent</title>
-{% endblock page_title %}
-
 {% block main_dashboard_content %}
-<div class="video-placeholder">
-    MAIN AREA - AI Agent
+<div class="ai-agent-container">
+    <div class="header">
+        <h1>AI Agent Interface</h1>
+        <div class="mode-toggle">
+            <span class="toggle-label">Text Mode</span>
+            <label class="switch">
+                <input type="checkbox" id="mode-toggle-checkbox">
+                <span class="slider round"></span>
+            </label>
+            <span class="toggle-label">Speech Mode</span>
+        </div>
+    </div>
+
+    <div class="chat-display" id="chat-display">
+        <!-- Conversation will be appended here -->
+        <div class="message system">
+            <p>Welcome to the HeliXR AI Agent. Select a mode to begin.</p>
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <!-- Text Input Form -->
+        <form id="text-input-form" class="input-mode-element">
+            <input type="text" id="prompt-input" placeholder="Type your command or question..." autocomplete="off">
+            <button type="submit"><i class="fas fa-paper-plane"></i></button>
+        </form>
+
+        <!-- Voice Input Control -->
+        <div id="voice-input-controls" class="input-mode-element" style="display: none;">
+            <button id="mic-button">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <p id="mic-status">Press the microphone to start speaking</p>
+        </div>
+    </div>
 </div>
+
+<!-- Add Socket.IO and the custom JS file -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard_ai_agent.js') }}"></script>
+
 {% endblock main_dashboard_content %}
