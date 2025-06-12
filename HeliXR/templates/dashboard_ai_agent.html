@@ -32,10 +32,15 @@
 
         <!-- Voice Input Control -->
         <div id="voice-input-controls" class="input-mode-element" style="display: none;">
-            <button id="mic-button">
-                <i class="fas fa-microphone"></i>
-            </button>
-            <p id="mic-status">Press the microphone to start speaking</p>
+            <div class="voice-buttons-container">
+                <button id="mic-button" title="Toggle Mute" disabled>
+                    <i id="mic-icon" class="fas fa-microphone-slash"></i>
+                </button>
+                <button id="terminate-agent-button" title="End Voice Session" disabled>
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+            <p id="mic-status">Switch to Voice Mode to connect the agent.</p>
         </div>
     </div>
 </div>

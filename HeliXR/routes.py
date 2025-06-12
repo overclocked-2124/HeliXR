@@ -1,6 +1,5 @@
-import os
-import threading
-from flask import request, render_template, url_for, flash, redirect, jsonify
+import os, threading
+from flask import request, render_template, jsonify, url_for, flash, redirect
 from flask_socketio import emit
 from HeliXR import app, db, bcrypt, socketio
 from HeliXR.forms import RegistrationForm, LoginForm
@@ -8,61 +7,122 @@ from HeliXR.models import User
 from flask_login import login_user, current_user, logout_user
 from dotenv import load_dotenv
 import google.generativeai as genai
+import traceback
+
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import Conversation
-from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+# ---------- GLOBAL STATE ----------
 active_agents = {}
 
-class SafeAudioInterface(DefaultAudioInterface):
-    """Custom audio interface to prevent crashes on stop."""
+# ---------- FINAL, CORRECTED DUMMY AUDIO INTERFACE ----------
+class HeadlessAudioInterface:
+    """A fully-featured dummy interface that handles input and output correctly."""
+    def __init__(self):
+        self.input_callback = None
+        # THE FIX: The output must be a callable that accepts any arguments and does nothing.
+        self.output = lambda *args, **kwargs: None
+
+    def start(self, input_callback):
+        self.input_callback = input_callback
+
     def stop(self):
-        try:
-            super().stop()
-        except OSError as e:
-            print(f"Warning: Audio stop failed due to: {e}")
+        self.input_callback = None
 
+    def push_audio(self, audio_chunk: bytes):
+        if self.input_callback:
+            self.input_callback(audio_chunk)
+
+# ---------- ELEVENLABS THREAD ----------
 def run_elevenlabs_agent(sid):
-    """
-    The target function for the voice agent thread.
-    Communicates with the client via Socket.IO.
-    """
     try:
-        def on_agent_response(response):
-            socketio.emit('agent_response', {'data': response}, room=sid)
-            print(f"Agent (to {sid[:5]}): {response}")
-
-        def on_user_transcript(transcript):
-            socketio.emit('user_transcript', {'data': transcript}, room=sid)
-            print(f"User (from {sid[:5]}): {transcript}")
+        def on_agent_response(resp_iterator):
+            for resp in resp_iterator:
+                if resp.type == 'TEXT':
+                    socketio.emit('agent_text_chunk', {'data': resp.text}, room=sid)
+                elif resp.type == 'AUDIO':
+                    socketio.emit('agent_audio_chunk', resp.audio, room=sid)
+        
+        def on_user_transcript(txt):
+            socketio.emit('user_transcript', {'data': txt}, room=sid)
 
         client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
-        conversation = Conversation(
-            client,
-            os.getenv("AGENT_ID"),
-            requires_auth=bool(os.getenv("ELEVENLABS_API_KEY")),
-            audio_interface=SafeAudioInterface(),
+        headless_interface = HeadlessAudioInterface()
+
+        conv = Conversation(
+            client=client,
+            agent_id=os.getenv("AGENT_ID"),
+            requires_auth=(os.getenv("ELEVENLABS_API_KEY") is not None),
+            audio_interface=headless_interface,
             callback_agent_response=on_agent_response,
-            callback_user_transcript=on_user_transcript,
+            callback_user_transcript=on_user_transcript
         )
-
-        active_agents[sid]['conversation'] = conversation
-        conversation.start_session()
-        # The loop below will run until the session ends
-        conversation.wait_for_session_end()
-        print(f"Conversation for SID {sid[:5]} ended.")
-
+        
+        active_agents[sid] = {'conversation': conv, 'interface': headless_interface}
+        socketio.emit('agent_started', {'data': 'Voice agent session started.'}, room=sid)
+        
+        conv.start_session()
+        conv.wait_for_session_end()
+        print(f"Conversation ended for {sid[:5]}")
     except Exception as e:
-        print(f"Error in ElevenLabs agent for SID {sid[:5]}: {e}")
+        print(f"Error in agent thread for {sid[:5]}:")
+        traceback.print_exc()
+        socketio.emit('error', {'data': str(e)}, room=sid)
     finally:
-        if sid in active_agents:
-            del active_agents[sid]
+        active_agents.pop(sid, None)
         socketio.emit('agent_stopped', {'data': 'Session has ended.'}, room=sid)
 
+# ---------- SOCKET.IO EVENTS ----------
+@socketio.on('connect')
+def handle_connect():
+    print(f'Client connected: {request.sid}')
 
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    print(f'Client disconnected: {sid}')
+    agent_data = active_agents.get(sid)
+    if agent_data and agent_data.get('conversation'):
+        agent_data['conversation'].end_session()
+
+@socketio.on('start_agent')
+def handle_start_agent():
+    sid = request.sid
+    if sid in active_agents:
+        emit('error', {'data': 'Agent already running.'})
+        return
+    print(f"Launching voice agent for {sid[:5]} …")
+    t = threading.Thread(target=run_elevenlabs_agent, args=(sid,))
+    t.start()
+
+@socketio.on('stop_agent')
+def handle_stop_agent():
+    sid = request.sid
+    agent_data = active_agents.get(sid)
+    if agent_data and agent_data.get('conversation'):
+        agent_data['conversation'].end_session()
+    else:
+        emit('error', {'data': 'No active agent to stop.'})
+
+@socketio.on('audio_in')
+def handle_audio_in(data):
+    sid = request.sid
+    agent_data = active_agents.get(sid)
+    
+    if not agent_data or not agent_data.get('interface'):
+        emit('error', {'data': 'Voice agent or interface not initialised.'}, room=sid)
+        return
+    try:
+        agent_data['interface'].push_audio(data)
+    except Exception as e:
+        print(f"Audio routing error for {sid[:5]}: {e}")
+        emit('error', {'data': f'Audio send failed: {e}'}, room=sid)
+
+# ---------- REMAINDER OF FILE: existing Flask routes ----------
+# (Unchanged)
 @app.route('/')
 def home():
     return render_template('index.html',title="HELIXR",css_path="index")
@@ -131,39 +191,3 @@ def gemini_chat():
     except Exception as e:
         print(f"Gemini API Error: {e}")
         return jsonify({'error': 'Failed to get response from AI'}), 500
-
-@socketio.on('connect')
-def handle_connect():
-    print(f'Client connected: {request.sid}')
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    print(f'Client disconnected: {request.sid}')
-    if request.sid in active_agents:
-        if active_agents[request.sid].get('conversation'):
-            active_agents[request.sid]['conversation'].end_session()
-        print(f"Cleaned up agent for SID: {request.sid[:5]}")
-
-@socketio.on('start_agent')
-def handle_start_agent():
-    sid = request.sid
-    if sid not in active_agents:
-        print(f"Starting voice agent for SID: {sid[:5]}...")
-        agent_thread = threading.Thread(target=run_elevenlabs_agent, args=(sid,))
-        active_agents[sid] = {'thread': agent_thread}
-        agent_thread.start()
-        emit('agent_started', {'data': 'Voice agent session started.'})
-    else:
-        print(f"Agent already running for SID: {sid[:5]}")
-        emit('error', {'data': 'Agent already running.'})
-
-
-@socketio.on('stop_agent')
-def handle_stop_agent():
-    sid = request.sid
-    if sid in active_agents and active_agents[sid].get('conversation'):
-        print(f"Stopping voice agent for SID: {sid[:5]}...")
-        active_agents[sid]['conversation'].end_session()
-    else:
-        print(f"No active agent to stop for SID: {sid[:5]}")
-        emit('error', {'data': 'No active agent to stop.'})
