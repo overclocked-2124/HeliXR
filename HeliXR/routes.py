@@ -3,7 +3,7 @@ from flask import request, render_template, jsonify, url_for, flash, redirect, s
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-
+import uuid
 from HeliXR import app, db, bcrypt # Removed socketio from imports
 from HeliXR.forms import RegistrationForm, LoginForm
 from HeliXR.models import User
@@ -11,6 +11,12 @@ from flask_login import login_user, current_user, logout_user
 
 # --- SETUP ---
 load_dotenv()
+
+TEMP_FOLDER = 'temp_audio'
+if not os.path.exists(TEMP_FOLDER):
+    os.makedirs(TEMP_FOLDER)
+
+app.config['TEMP_FOLDER'] = TEMP_FOLDER
 
 SYSTEM_PROMPT="""
 ## System Prompt for HeliXR: Polite AI Interaction Model for AR/VR Digital Twin in Food Manufacturing
@@ -115,3 +121,31 @@ def gemini_chat():
     response = chat.send_message(prompt)
     return jsonify({'reply': response.text})
 
+@app.route('/chat/voice_upload', methods=['POST'])
+def handle_voice_upload():
+    """Receives an audio file and saves it to a temporary directory."""
+    if 'audio_file' not in request.files:
+        return jsonify({"error": "No audio file part in the request"}), 400
+    
+    file = request.files['audio_file']
+    
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+        
+    if file:
+        # Generate a unique filename to prevent overwrites
+        filename = f"recording_{uuid.uuid4().hex}.webm"
+        filepath = os.path.join(app.config['TEMP_FOLDER'], filename)
+        
+        try:
+            file.save(filepath)
+            # This fulfills the request of saving the snippet.
+            # Next steps would be to transcribe the audio and send it to the AI.
+            return jsonify({
+                "message": "File uploaded and saved successfully.",
+                "filename": filename
+            }), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
+
+    return jsonify({"error": "An unknown error occurred"}), 500

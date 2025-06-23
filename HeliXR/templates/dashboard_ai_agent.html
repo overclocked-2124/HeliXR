@@ -3,16 +3,24 @@
 {% set active_page = 'ai_agent' %}
 
 {% block main_dashboard_content %}
-<div class="ai-agent-container">
+<div class="ai-agent-container" id="ai-agent-container"> <!-- Added ID -->
     <div class="header">
         <h1>AI Agent Interface</h1>
-        <!-- Voice/Text mode toggle has been removed -->
+        <!-- Voice/Text mode toggle -->
+        <div class="mode-toggle">
+            <label>Text</label>
+            <label class="toggle-switch">
+                <input type="checkbox" id="mode-toggle-checkbox">
+                <span class="slider"></span>
+            </label>
+            <label>Voice</label>
+        </div>
     </div>
 
     <div class="chat-display" id="chat-display">
         <!-- Conversation will be appended here -->
         <div class="message system">
-            <p>Welcome to the HeliXR AI Agent. How may I assist you today? <br>You can ask me to monitor data, operate equipment, or help troubleshoot any issues. <br>Just let me know what you need, and I’ll be happy to help.</p>
+            <p>Welcome to the HeliXR AI Agent. How may I assist you today? <br>You can ask me to monitor data, operate equipment, or help troubleshoot any issues. <br>Toggle to voice mode to record your commands.</p>
         </div>
     </div>
 
@@ -23,11 +31,14 @@
             <button type="submit"><i class="fas fa-paper-plane"></i></button>
         </form>
 
-        <!-- Voice input controls have been removed -->
+        <!-- Voice input controls -->
+        <div id="voice-input-controls">
+            <button id="mic-button"><i class="fas fa-microphone"></i></button>
+            <div id="mic-status">Click the microphone to start recording</div>
+        </div>
     </div>
 </div>
 
-<!-- Socket.IO script has been removed -->
 <script src="{{ url_for('static', filename='js/dashboard_ai_agent.js') }}"></script>
 
 {% endblock main_dashboard_content %}
