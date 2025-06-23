@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import uuid
-from HeliXR import app, db, bcrypt # Removed socketio from imports
+from HeliXR import app, db, bcrypt 
 from HeliXR.forms import RegistrationForm, LoginForm
 from HeliXR.models import User
 from flask_login import login_user, current_user, logout_user
@@ -17,6 +17,7 @@ if not os.path.exists(TEMP_FOLDER):
     os.makedirs(TEMP_FOLDER)
 
 app.config['TEMP_FOLDER'] = TEMP_FOLDER
+
 
 SYSTEM_PROMPT="""
 ## System Prompt for HeliXR: Polite AI Interaction Model for AR/VR Digital Twin in Food Manufacturing
@@ -123,7 +124,7 @@ def gemini_chat():
 
 @app.route('/chat/voice_upload', methods=['POST'])
 def handle_voice_upload():
-    """Receives an audio file and saves it to a temporary directory."""
+    """Receives an audio file, saves it, transcribes it, and returns the text."""
     if 'audio_file' not in request.files:
         return jsonify({"error": "No audio file part in the request"}), 400
     
@@ -133,19 +134,28 @@ def handle_voice_upload():
         return jsonify({"error": "No selected file"}), 400
         
     if file:
-        # Generate a unique filename to prevent overwrites
-        filename = f"recording_{uuid.uuid4().hex}.webm"
+        filename = f"recording_{uuid.uuid4().hex}.mp3"
         filepath = os.path.join(app.config['TEMP_FOLDER'], filename)
         
         try:
             file.save(filepath)
-            # This fulfills the request of saving the snippet.
-            # Next steps would be to transcribe the audio and send it to the AI.
+
+            myfile = client.files.upload(file=filepath)
+            prompt = 'Extract the text from the speech'
+
+            response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[prompt, myfile]
+            )
+
+            #os.remove(filepath)
+
             return jsonify({
-                "message": "File uploaded and saved successfully.",
-                "filename": filename
+                "transcription": response.text
             }), 200
+
         except Exception as e:
-            return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
+            print(f"An error occurred during transcription: {e}")
+            return jsonify({"error": f"Failed to process audio: {str(e)}"}), 500
 
     return jsonify({"error": "An unknown error occurred"}), 500
