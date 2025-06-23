@@ -6,47 +6,28 @@
 <div class="ai-agent-container">
     <div class="header">
         <h1>AI Agent Interface</h1>
-        <div class="mode-toggle">
-            <span class="toggle-label">Text Mode</span>
-            <label class="switch">
-                <input type="checkbox" id="mode-toggle-checkbox">
-                <span class="slider round"></span>
-            </label>
-            <span class="toggle-label">Speech Mode</span>
-        </div>
+        <!-- Voice/Text mode toggle has been removed -->
     </div>
 
     <div class="chat-display" id="chat-display">
         <!-- Conversation will be appended here -->
         <div class="message system">
-            <p>Welcome to the HeliXR AI Agent. Select a mode to begin.</p>
+            <p>Welcome to the HeliXR AI Agent. How may I assist you today? <br>You can ask me to monitor data, operate equipment, or help troubleshoot any issues. <br>Just let me know what you need, and I’ll be happy to help.</p>
         </div>
     </div>
 
     <div class="chat-input-area">
         <!-- Text Input Form -->
-        <form id="text-input-form" class="input-mode-element">
+        <form id="text-input-form">
             <input type="text" id="prompt-input" placeholder="Type your command or question..." autocomplete="off">
             <button type="submit"><i class="fas fa-paper-plane"></i></button>
         </form>
 
-        <!-- Voice Input Control -->
-        <div id="voice-input-controls" class="input-mode-element" style="display: none;">
-            <div class="voice-buttons-container">
-                <button id="mic-button" title="Toggle Mute" disabled>
-                    <i id="mic-icon" class="fas fa-microphone-slash"></i>
-                </button>
-                <button id="terminate-agent-button" title="End Voice Session" disabled>
-                    <i class="fas fa-phone-slash"></i>
-                </button>
-            </div>
-            <p id="mic-status">Switch to Voice Mode to connect the agent.</p>
-        </div>
+        <!-- Voice input controls have been removed -->
     </div>
 </div>
 
-<!-- Add Socket.IO and the custom JS file -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+<!-- Socket.IO script has been removed -->
 <script src="{{ url_for('static', filename='js/dashboard_ai_agent.js') }}"></script>
 
 {% endblock main_dashboard_content %}

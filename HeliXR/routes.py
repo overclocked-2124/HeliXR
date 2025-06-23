@@ -1,15 +1,10 @@
 import os
-import threading
-import time
-import random
-from functools import wraps
-from flask import request, render_template, jsonify, url_for, flash, redirect
-from flask_socketio import emit
-from google import genai  # NEW SDK
-from google.genai import types  # NEW SDK types
+from flask import request, render_template, jsonify, url_for, flash, redirect, session
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
-from HeliXR import app, db, bcrypt, socketio
+from HeliXR import app, db, bcrypt # Removed socketio from imports
 from HeliXR.forms import RegistrationForm, LoginForm
 from HeliXR.models import User
 from flask_login import login_user, current_user, logout_user
@@ -17,188 +12,40 @@ from flask_login import login_user, current_user, logout_user
 # --- SETUP ---
 load_dotenv()
 
-# Initialize NEW SDK client
+SYSTEM_PROMPT="""
+## System Prompt for HeliXR: Polite AI Interaction Model for AR/VR Digital Twin in Food Manufacturing
+
+You are HeliXR, an advanced, polite, and professional AI assistant developed by Alpha Q. You are responsible for interacting with users through both text and voice on an AR/VR digital twin platform tailored for the food manufacturing industry. Your primary roles include:
+
+- Guiding users in monitoring real-time data from all parts of the supply chain.
+- Assisting users in manually operating, opening, or closing valves via touch or voice commands.
+- Providing real-time visual feedback on the operational status of valves and other equipment.
+- Detecting, highlighting, and explaining areas where problems or anomalies have been detected based on data analysis.
+- Serving as a dedicated voice agent, enabling users to control and monitor all aspects of the system using natural, conversational speech.
+
+**Behavioral Guidelines:**
+
+- Always maintain a polite, respectful, and supportive tone, addressing users courteously and thanking them for their input or patience when appropriate.
+- Respond to queries clearly and concisely, offering step-by-step guidance or detailed explanations as needed, while avoiding unnecessary jargon unless requested by the user.
+- When a user’s input is unclear or ambiguous, politely ask clarifying questions to ensure you fully understand their request before proceeding.
+- Adapt your responses to match the user’s technical expertise: use simple explanations for non-experts and more technical language for advanced users, while always remaining approachable and encouraging.
+- Confirm user commands before executing critical actions (such as shutting off valves), and provide clear feedback on the result of each action.
+- Never share or request sensitive information, passwords, or confidential data.
+- If you are unable to fulfill a request, explain the reason politely and, if possible, suggest alternative actions or direct the user to appropriate support resources.
+
+**Output and Interaction Format:**
+
+- Use a conversational, friendly style that fosters trust and engagement, while remaining efficient and to the point.
+- For voice interactions, speak naturally, clearly, and with empathy, ensuring users feel heard and understood.
+- For visual or AR/VR feedback, describe what is being shown and offer to walk the user through any process or troubleshooting step by step.
+- Always close interactions with a polite acknowledgment, such as "Thank you for your request," or "Is there anything else I can assist you with today?"
+- Be less verbose and precise at any cost.
+"""
+
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-# --- GLOBAL STATE ---
-active_conversations = {}
-
-# --- ERROR HANDLING ---
-def retry_with_backoff(max_retries=3, base_delay=2):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    error_str = str(e)
-                    if any(code in error_str for code in ["500", "503", "429", "INTERNAL", "UNAVAILABLE", "RESOURCE_EXHAUSTED"]):
-                        if attempt < max_retries - 1:
-                            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-                            print(f"API error on attempt {attempt + 1}, retrying in {delay:.2f}s")
-                            time.sleep(delay)
-                            continue
-                    raise e
-            return None
-        return wrapper
-    return decorator
-
-# --- CORE AGENT LOGIC ---
-@retry_with_backoff(max_retries=3, base_delay=2)
-def process_audio_turn(sid, wav_data):
-    """
-    Process audio using NEW Google Gen AI SDK with proper role management
-    """
-    try:
-        # Validate audio data size
-        if len(wav_data) > 8 * 1024 * 1024:
-            socketio.emit("error", {"data": "Audio file too large. Please speak for shorter periods."}, room=sid)
-            return
-
-        # Get or create conversation history with proper role alternation
-        if sid not in active_conversations:
-            active_conversations[sid] = []
-            print(f"New conversation created for {sid[:5]}.")
-        
-        conversation = active_conversations[sid]
-
-        # Create user audio content with explicit role
-        user_content = types.Content(
-            role="user",  # Explicitly set role
-            parts=[
-                types.Part.from_bytes(
-                    data=wav_data, 
-                    mime_type="audio/wav"
-                )
-            ]
-        )
-        
-        # Add user message to conversation
-        conversation.append(user_content)
-
-        print(f"Sending audio turn ({len(wav_data)} bytes) to Gemini 2.5 Flash for {sid[:5]}...")
-        
-        # Generate response using NEW SDK
-        response = client.models.generate_content(
-            model='gemini-2.5-flash-preview-05-20',
-            contents=conversation,
-            config=types.GenerateContentConfig(
-                max_output_tokens=2000,
-                temperature=0.7,
-                top_p=0.9,
-                response_mime_type="text/plain"
-            )
-        )
-
-        if response.text:
-            # Create assistant response with explicit role
-            assistant_content = types.Content(
-                role="model",  # Explicitly set role
-                parts=[types.Part.from_text(response.text)]
-            )
-            
-            # Add assistant response to conversation
-            conversation.append(assistant_content)
-            
-            # Emit the text response
-            socketio.emit("agent_response_text", {
-                "text": response.text, 
-                "is_partial": False
-            }, room=sid)
-            
-            # Generate audio response
-            synthesize_and_send_audio(sid, response.text)
-        else:
-            socketio.emit("error", {"data": "No response generated. Please try again."}, room=sid)
-
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Error in Gemini 2.5 Flash processing for {sid[:5]}: {error_msg}")
-        
-        # Clear conversation if role error occurs
-        if "role" in error_msg.lower() or "invalid_argument" in error_msg.lower():
-            active_conversations[sid] = []
-            socketio.emit("error", {"data": "Conversation reset due to role error. Please try again."}, room=sid)
-        elif "500" in error_msg or "INTERNAL" in error_msg:
-            socketio.emit("error", {"data": "Server temporarily overloaded. Please try again."}, room=sid)
-        elif "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-            socketio.emit("error", {"data": "Rate limit exceeded. Please wait before sending another message."}, room=sid)
-        elif "403" in error_msg:
-            socketio.emit("error", {"data": "API key issue. Please check your configuration."}, room=sid)
-        else:
-            socketio.emit("error", {"data": f"Audio processing error: {error_msg}"}, room=sid)
-
-@retry_with_backoff(max_retries=2, base_delay=1)
-def synthesize_and_send_audio(sid, text_to_speak):
-    """
-    TTS with error handling
-    """
-    try:
-        from google.cloud import texttospeech
-        
-        # Limit text length
-        if len(text_to_speak) > 1200:
-            text_to_speak = text_to_speak[:1200] + "..."
-        
-        print(f"Synthesizing audio for {sid[:5]}: '{text_to_speak[:50]}...'")
-        tts_client = texttospeech.TextToSpeechClient()
-        synthesis_input = texttospeech.SynthesisInput(text=text_to_speak)
-        
-        voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US", 
-            name="en-US-Neural2-C"
-        )
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=1.0
-        )
-
-        tts_response = tts_client.synthesize_speech(
-            input=synthesis_input, 
-            voice=voice, 
-            audio_config=audio_config
-        )
-
-        socketio.emit("agent_response_audio", tts_response.audio_content, room=sid)
-        print(f"Sent synthesized audio ({len(tts_response.audio_content)} bytes) to {sid[:5]}.")
-
-    except ImportError:
-        print("TTS library not installed.")
-        socketio.emit("error", {"data": "Text-to-speech not available."}, room=sid)
-    except Exception as e:
-        print(f"TTS Error for {sid[:5]}: {e}")
-
-# --- SOCKET.IO EVENTS ---
-@socketio.on("connect")
-def handle_connect():
-    print(f"Client connected: {request.sid}")
-
-@socketio.on("disconnect")
-def handle_disconnect():
-    print(f"Client disconnected: {request.sid}")
-    active_conversations.pop(request.sid, None)
-
-@socketio.on("start_agent")
-def handle_start_agent():
-    # Clear any existing conversation to avoid role issues
-    active_conversations[request.sid] = []
-    emit('agent_started', {'data': 'Gemini 2.5 Flash audio agent ready with NEW SDK.'})
-
-@socketio.on("stop_agent")
-def handle_stop_agent():
-    active_conversations.pop(request.sid, None)
-    print(f"Agent stopped and conversation cleared for {request.sid[:5]}.")
-    emit('agent_stopped', {'data': 'Gemini 2.5 Flash voice agent disconnected.'})
-
-@socketio.on("process_user_turn")
-def handle_user_turn(wav_data):
-    sid = request.sid
-    if not wav_data or len(wav_data) == 0:
-        socketio.emit("error", {"data": "No audio data received."}, room=sid)
-        return
-    
-    threading.Thread(target=process_audio_turn, args=(sid, wav_data)).start()
+chat = client.chats.create(model="gemini-2.5-flash")
+response = chat.send_message(SYSTEM_PROMPT)
 
 # --- FLASK ROUTES ---
 @app.route('/')
@@ -225,6 +72,7 @@ def login():
             user = User.query.filter_by(email=form.email.data).first()
             if user and bcrypt.check_password_hash(user.password, form.password.data):
                 login_user(user, remember=form.remember.data)
+                session['chat_history'] = [] # Clear chat history on new login
                 return redirect(url_for('dashboard_analytics'))
             else:
                 flash('Login Unsuccessful. Please check email and password', 'danger')
@@ -232,6 +80,7 @@ def login():
 
 @app.route('/logout')
 def logout():
+    session.pop('chat_history', None) # Clear chat history on logout
     logout_user()
     return redirect(url_for('home'))
 
@@ -241,6 +90,9 @@ def dashboard_analytics():
 
 @app.route('/dashboard_ai_agent')
 def dashboard_ai_agent():
+    # Reset chat history when navigating to the page for a clean slate
+    session['chat_history'] = []
+    session.modified = True
     return render_template('dashboard_ai_agent.html', title="HELIXR AI Agent", css_path="dashboard_ai_agent")
 
 @app.route('/dashboard_command')
@@ -260,17 +112,6 @@ def gemini_chat():
     if not prompt:
         return jsonify({'error': 'No prompt provided'}), 400
     
-    try:
-        # Use NEW SDK for text chat
-        response = client.models.generate_content(
-            model='gemini-2.5-flash-preview-05-20',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=2000,
-                temperature=0.7
-            )
-        )
-        return jsonify({'reply': response.text})
-    except Exception as e:
-        print(f"Gemini 2.5 Flash API Error: {e}")
-        return jsonify({'error': 'Failed to get response from Gemini 2.5 Flash'}), 500
+    response = chat.send_message(prompt)
+    return jsonify({'reply': response.text})
+
