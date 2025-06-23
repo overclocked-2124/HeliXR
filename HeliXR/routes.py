@@ -12,16 +12,8 @@ from flask_login import login_user, current_user, logout_user
 # --- SETUP ---
 load_dotenv()
 
-# Initialize NEW SDK client
-try:
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-    if not os.getenv("GEMINI_API_KEY"):
-        print("WARNING: GEMINI_API_KEY environment variable not set.")
-except Exception as e:
-    print(f"Error initializing Google GenAI Client: {e}")
-    client = None
-
-# --- ALL VOICE-RELATED LOGIC & SOCKET.IO EVENTS HAVE BEEN REMOVED ---
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+chat = client.chats.create(model="gemini-2.5-flash")
 
 
 # --- FLASK ROUTES ---
@@ -89,17 +81,6 @@ def gemini_chat():
     if not prompt:
         return jsonify({'error': 'No prompt provided'}), 400
     
-    try:
-        # Use NEW SDK for text chat
-        response = client.models.generate_content(
-            model='gemini-2.5-flash-preview-05-20',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=2000,
-                temperature=0.7
-            )
-        )
-        return jsonify({'reply': response.text})
-    except Exception as e:
-        print(f"Gemini 2.5 Flash API Error: {e}")
-        return jsonify({'error': 'Failed to get response from Gemini 2.5 Flash'}), 500
+    response = chat.send_message(prompt)
+    return jsonify({'reply': response.text})
+
