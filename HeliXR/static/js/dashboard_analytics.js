@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     label: 'Environment Temp (°C)',
                     data: [],
                     borderColor: '#ff6b6b',
-                    backgroundColor: 'rgba(255, 107, 107, 1)',
+                    backgroundColor: 'transparent',
                     fill: true,
                     tension: 0.4,
                 },
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     label: 'Sensor Temp (°C)',
                     data: [],
                     borderColor: '#74b9ff',
-                    backgroundColor: 'rgba(116, 185, 255, 1)',
+                    backgroundColor: 'transparent',
                     fill: true,
                     tension: 0.4,
                 }
