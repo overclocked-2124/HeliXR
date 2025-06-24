@@ -1,15 +1,24 @@
 # routes.py
 
 import os
-import uuid
-import traceback
-from flask import request, render_template, jsonify, url_for, flash, redirect, session
-from google import genai
-# REMOVED: from google.genai import types
+import threading
+import time
+import random
+import traceback  # Add to top of file
+from pymongo import errors as mongo_errors
+from functools import wraps
+from flask import request, render_template, jsonify, url_for, flash, redirect, current_app,session
+from flask_socketio import emit
+from google import genai  # NEW SDK # NEW SDK types
 from dotenv import load_dotenv
-from HeliXR import app, db, bcrypt
+from pymongo import MongoClient
+from bson.json_util import dumps
+from datetime import datetime
+
+from HeliXR import app, db, bcrypt, socketio
 from HeliXR.forms import RegistrationForm, LoginForm
 from HeliXR.models import User
+from pymongo import MongoClient
 from flask_login import login_user, current_user, logout_user
 
 # --- NEW IMPORTS FOR CHATTERBOX TTS ---
@@ -19,6 +28,39 @@ from chatterbox.tts import ChatterboxTTS
 
 # --- SETUP ---
 load_dotenv()
+
+
+def init_mongo():
+    try:
+        # Get connection string from environment or config
+        mongo_uri = app.config.get('MONGO_URI', 'mongodb://localhost:27017/')
+        
+        # Connect to MongoDB
+        client = MongoClient(mongo_uri)
+        
+        # Get database and collection
+        app.mongo_db = client[app.config['MONGO_DB_NAME']]
+        app.mongo_collection = app.mongo_db[app.config['MONGO_COLLECTION_NAME']]
+
+        
+    except Exception as e:
+        app.logger.error(f"MongoDB initialization failed: {str(e)}")
+        return None
+
+# Use this in your routes
+sensor_collection = init_mongo() 
+
+
+@socketio.on("connect")
+
+def on_connect():
+    app.logger.info("Client connected:")
+
+@socketio.on('disconnect')
+
+def on_disconnect():
+    app.logger.info('Client disconnected')
+
 
 # Folder for temporary user voice uploads
 TEMP_FOLDER = 'temp_audio'
@@ -60,6 +102,7 @@ You are HeliXR, an advanced, polite, and professional AI assistant developed by 
 """
 
 # --- GEMINI CLIENT INITIALIZATION (for text chat) ---
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 chat = client.chats.create(model="gemini-2.5-flash")
 response = chat.send_message(SYSTEM_PROMPT)
@@ -123,6 +166,56 @@ def logout():
 @app.route('/dashboard_analytics')
 def dashboard_analytics():
     return render_template('dashboard_analytics.html', title="HELIXR Analytics", css_path="dashboard_analytics")
+
+@app.route("/api/sensor-data")
+def latest_sensor_data():
+    # Check MongoDB connection status with detailed logging
+    if not hasattr(current_app, 'mongo_collection'):
+        current_app.logger.error("❌ MongoDB collection not initialized in app context")
+        return jsonify({"error": "Database not initialized"}), 500
+        
+    if current_app.mongo_collection is None:
+        current_app.logger.error("❌ MongoDB collection is None")
+        return jsonify({"error": "Database not available"}), 500
+        
+    try:
+        current_app.logger.info("⌛ Attempting to query MongoDB...")
+        
+        # Test if collection is accessible
+        collection_name = current_app.mongo_collection.name
+        db_name = current_app.mongo_collection.database.name
+        current_app.logger.info(f"📁 Using database: {db_name}, collection: {collection_name}")
+        
+        # Find the latest document
+        latest = current_app.mongo_collection.find_one(sort=[("timestamp", -1)])
+        
+        if latest:
+            current_app.logger.info(f"✅ Found document with ID: {latest.get('_id')}")
+            sauce_data = latest.get("sauce_sensor_data", {})
+            env_data = latest.get("environment_data", {}) 
+            return jsonify({
+                "temperature": sauce_data.get("temperature_c", 0),
+                "humidity": sauce_data.get("humidity_pct", 0),
+                "pH": sauce_data.get("pH", 0),
+                "color_rgb": sauce_data.get("color_rgb", [0,0,0]),
+
+                "env_temp": env_data.get("temperature_c", 0),
+                "env_humidity": env_data.get("humidity_pct", 0)
+            })
+        else:
+            current_app.logger.warning("⚠️ No documents found in collection")
+            return jsonify({"error": "No data found"}), 404
+            
+    except mongo_errors.ServerSelectionTimeoutError as e:
+        current_app.logger.error(f"⌛❌ MongoDB timeout: {str(e)}")
+        return jsonify({"error": "Database timeout"}), 500
+    except mongo_errors.OperationFailure as e:
+        current_app.logger.error(f"🔒❌ MongoDB auth failure: {str(e)}")
+        return jsonify({"error": "Authentication failed"}), 500
+    except Exception as e:
+        current_app.logger.error(f"❌ Unexpected error: {str(e)}")
+        current_app.logger.error(traceback.format_exc())  # Full traceback
+        return jsonify({"error": "Database query failed"}), 500
 
 @app.route('/dashboard_ai_agent')
 def dashboard_ai_agent():
