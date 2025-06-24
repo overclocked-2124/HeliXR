@@ -1,295 +1,36 @@
-/* dashboard_ai_agent.js – Gemini Native Audio Chat Client */
+/* dashboard_ai_agent.js – Text and Voice Chat Client with Client-Side Audio Playback */
 
 document.addEventListener('DOMContentLoaded', () => {
     // ---------- DOM ELEMENTS ----------
-    const modeToggle = document.getElementById('mode-toggle-checkbox');
+    const agentContainer = document.getElementById('ai-agent-container');
     const textInputForm = document.getElementById('text-input-form');
-    const voiceInputControls = document.getElementById('voice-input-controls');
     const promptInput = document.getElementById('prompt-input');
     const chatDisplay = document.getElementById('chat-display');
+    const modeToggle = document.getElementById('mode-toggle-checkbox');
     const micButton = document.getElementById('mic-button');
-    const micIcon = document.getElementById('mic-icon');
     const micStatus = document.getElementById('mic-status');
-    const terminateAgentButton = document.getElementById('terminate-agent-button');
 
-    // ---------- STATE ----------
-    let agentReady = false;
+    // ---------- STATE VARIABLES ----------
     let isRecording = false;
-    let userMicStream, userAudioCtx, sourceNode, processorNode;
-    const socket = io();
-
-    // ---------- VAD & RECORDING STATE ----------
-    let silenceTimer = null;
-    let recordedChunks = [];
-    const VAD_THRESHOLD = 0.01;
-    const SILENCE_TIMEOUT = 1500;
-
-    // ---------- AUDIO PLAYBACK STATE ----------
-    let agentPlaybackCtx;
-    const agentAudioQueue = [];
-    let isPlayingAgentAudio = false;
+    let mediaRecorder;
+    let audioChunks = [];
 
     // ---------- HELPER FUNCTIONS ----------
     function addMessage(sender, text) {
         const div = document.createElement('div');
         div.classList.add('message', sender);
         const p = document.createElement('p');
-        p.textContent = text;
+        p.innerHTML = text; // Use innerHTML to render potential formatting
         div.appendChild(p);
         chatDisplay.appendChild(div);
         chatDisplay.scrollTop = chatDisplay.scrollHeight;
-        return div;
     }
 
-    // ---------- AUDIO PROCESSING ----------
-    function convertToInt16PCM(float32Array, sampleRate) {
-        // Convert Float32Array to Int16Array (16-bit PCM)
-        const int16Array = new Int16Array(float32Array.length);
-        for (let i = 0; i < float32Array.length; i++) {
-            const s = Math.max(-1, Math.min(1, float32Array[i]));
-            int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        return int16Array.buffer;
-    }
-
-    function resampleTo16kHz(audioBuffer, originalSampleRate) {
-        if (originalSampleRate === 16000) {
-            return audioBuffer;
-        }
-        
-        const ratio = originalSampleRate / 16000;
-        const newLength = Math.round(audioBuffer.length / ratio);
-        const result = new Float32Array(newLength);
-        
-        for (let i = 0; i < newLength; i++) {
-            const originalIndex = i * ratio;
-            const index = Math.floor(originalIndex);
-            const fraction = originalIndex - index;
-            
-            if (index + 1 < audioBuffer.length) {
-                result[i] = audioBuffer[index] * (1 - fraction) + audioBuffer[index + 1] * fraction;
-            } else {
-                result[i] = audioBuffer[index];
-            }
-        }
-        
-        return result;
-    }
-
-    // ---------- RECORDING FUNCTIONS ----------
-    async function startRecording() {
-        if (isRecording) return;
-
-        try {
-            userMicStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    channelCount: 1,
-                    sampleRate: 16000, // Request 16kHz if possible
-                    echoCancellation: true,
-                    noiseSuppression: true
-                }
-            });
-
-            userAudioCtx = new AudioContext();
-            sourceNode = userAudioCtx.createMediaStreamSource(userMicStream);
-            
-            // Use AudioWorklet if available, fallback to ScriptProcessor
-            if (userAudioCtx.audioWorklet) {
-                // Modern approach - would need to implement AudioWorklet
-                processorNode = userAudioCtx.createScriptProcessor(4096, 1, 1);
-            } else {
-                processorNode = userAudioCtx.createScriptProcessor(4096, 1, 1);
-            }
-
-            processorNode.onaudioprocess = (e) => {
-                if (!isRecording) return;
-
-                const inputData = e.inputBuffer.getChannelData(0);
-                
-                // Calculate RMS for VAD
-                let sum = 0.0;
-                for (let i = 0; i < inputData.length; i++) {
-                    sum += inputData[i] * inputData[i];
-                }
-                const rms = Math.sqrt(sum / inputData.length);
-
-                if (rms > VAD_THRESHOLD) {
-                    // Speech detected
-                    recordedChunks.push(new Float32Array(inputData));
-                    clearTimeout(silenceTimer);
-                    micStatus.textContent = "Listening...";
-                } else {
-                    // Silence detected
-                    if (recordedChunks.length > 0 && !silenceTimer) {
-                        silenceTimer = setTimeout(finishTurn, SILENCE_TIMEOUT);
-                    }
-                }
-            };
-
-            sourceNode.connect(processorNode);
-            processorNode.connect(userAudioCtx.destination);
-
-            isRecording = true;
-            micButton.classList.add('listening');
-            micIcon.className = 'fas fa-microphone';
-            micStatus.textContent = "Listening... (speak now)";
-
-        } catch (err) {
-            addMessage('system', `Microphone Error: ${err.message}`);
-        }
-    }
-
-    function stopRecording() {
-        if (!isRecording) return;
-
-        isRecording = false;
-        clearTimeout(silenceTimer);
-        silenceTimer = null;
-
-        if (processorNode) {
-            processorNode.disconnect();
-            processorNode = null;
-        }
-        if (sourceNode) {
-            sourceNode.disconnect();
-            sourceNode = null;
-        }
-        if (userMicStream) {
-            userMicStream.getTracks().forEach(track => track.stop());
-            userMicStream = null;
-        }
-        if (userAudioCtx && userAudioCtx.state !== 'closed') {
-            userAudioCtx.close().catch(console.error);
-            userAudioCtx = null;
-        }
-
-        micButton.classList.remove('listening');
-        micIcon.className = 'fas fa-microphone-slash';
-        micStatus.textContent = "Click mic to speak.";
-    }
-
-    function finishTurn() {
-        if (recordedChunks.length === 0) {
-            stopRecording();
-            setTimeout(startRecording, 200);
-            return;
-        }
-
-        micStatus.textContent = "Processing...";
-
-        // Combine all recorded chunks
-        const totalLength = recordedChunks.reduce((acc, chunk) => acc + chunk.length, 0);
-        const combinedAudio = new Float32Array(totalLength);
-        let offset = 0;
-        
-        for (const chunk of recordedChunks) {
-            combinedAudio.set(chunk, offset);
-            offset += chunk.length;
-        }
-
-        // Resample to 16kHz if needed
-        const originalSampleRate = userAudioCtx.sampleRate;
-        const resampledAudio = resampleTo16kHz(combinedAudio, originalSampleRate);
-        
-        // Convert to 16-bit PCM
-        const pcmData = convertToInt16PCM(resampledAudio, 16000);
-
-        // Send to backend
-        socket.emit("process_user_turn", pcmData);
-        addMessage('user', "[Voice message]");
-
-        // Reset for next turn
-        recordedChunks = [];
-        stopRecording();
-        setTimeout(startRecording, 500);
-    }
-
-    // ---------- AUDIO PLAYBACK ----------
-    function playAgentAudio(audioData) {
-        if (!agentPlaybackCtx) {
-            agentPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        if (agentPlaybackCtx.state === 'suspended') {
-            agentPlaybackCtx.resume();
-        }
-
-        // Convert base64 to array buffer if needed
-        let arrayBuffer;
-        if (typeof audioData === 'string') {
-            const binaryString = atob(audioData);
-            arrayBuffer = new ArrayBuffer(binaryString.length);
-            const uint8Array = new Uint8Array(arrayBuffer);
-            for (let i = 0; i < binaryString.length; i++) {
-                uint8Array[i] = binaryString.charCodeAt(i);
-            }
-        } else {
-            arrayBuffer = audioData;
-        }
-
-        // Play the audio
-        const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(blob);
-        const audio = new Audio(audioUrl);
-        
-        audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-        };
-        
-        audio.play().catch(e => {
-            console.error('Error playing audio:', e);
-        });
-    }
-
-    // ---------- EVENT LISTENERS ----------
-    modeToggle.addEventListener('change', () => {
-        const isVoiceMode = modeToggle.checked;
-        
-        if (isVoiceMode) {
-            textInputForm.style.display = 'none';
-            voiceInputControls.style.display = 'flex';
-            socket.emit("start_agent");
-        } else {
-            textInputForm.style.display = 'flex';
-            voiceInputControls.style.display = 'none';
-            stopRecording();
-            socket.emit("stop_agent");
-        }
-    });
-
-    micButton.addEventListener('click', () => {
-        if (!agentReady) return;
-
-        // Initialize audio context on user gesture
-        if (!agentPlaybackCtx) {
-            agentPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (agentPlaybackCtx.state === 'suspended') {
-            agentPlaybackCtx.resume();
-        }
-
-        if (isRecording) {
-            finishTurn();
-        } else {
-            startRecording();
-        }
-    });
-
-    terminateAgentButton.addEventListener('click', () => {
-        if (modeToggle.checked) {
-            modeToggle.click();
-        }
-    });
-
-    // Text chat functionality
-    textInputForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const prompt = promptInput.value.trim();
-        if (!prompt) return;
-
-        addMessage('user', prompt);
-        promptInput.value = '';
-
+    /**
+     * Sends a text prompt to the backend and plays the returned audio.
+     * @param {string} prompt The text to send to the AI.
+     */
+    async function sendPromptToAgent(prompt) {
         try {
             const response = await fetch('/chat/gemini', {
                 method: 'POST',
@@ -297,46 +38,144 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ prompt })
             });
 
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                const errorMessage = errorData?.error || `HTTP error! Status: ${response.status}`;
+                throw new Error(errorMessage);
+            }
+
             const data = await response.json();
             if (data.error) throw new Error(data.error);
+
+            // Add the agent's text message to the chat display
             addMessage('agent', data.reply);
+
+            // Check if an audio URL was provided and play it
+            if (data.audio_url) {
+                // The browser will handle playing the audio from this URL
+                const audio = new Audio(data.audio_url);
+                audio.play().catch(e => {
+                    console.error("Error playing audio:", e);
+                    // Browsers may block autoplay until a user interaction.
+                    // This is usually fine since this function is triggered by a user action.
+                    addMessage('system', 'System: Could not play audio automatically. Please check browser settings.');
+                });
+            }
+
         } catch (err) {
+            console.error('Error in sendPromptToAgent:', err);
             addMessage('system', `Error: ${err.message}`);
         }
-    });
+    }
 
-    // ---------- SOCKET EVENTS ----------
-    socket.on('agent_started', (data) => {
-        addMessage('system', data.data);
-        agentReady = true;
-        micButton.disabled = false;
-        terminateAgentButton.disabled = false;
-        micStatus.textContent = "Click mic to speak.";
-    });
-
-    socket.on('agent_stopped', (data) => {
-        addMessage('system', data.data);
-        agentReady = false;
-        stopRecording();
-        micButton.disabled = true;
-        terminateAgentButton.disabled = true;
-        micStatus.textContent = "Switch to voice mode to start.";
-    });
-
-    socket.on('agent_response_text', (data) => {
-        if (data.text && !data.is_partial) {
-            addMessage('agent', data.text);
+    // ---------- MODE TOGGLE LOGIC ----------
+    modeToggle.addEventListener('change', () => {
+        agentContainer.classList.toggle('voice-mode-active', modeToggle.checked);
+        if (!modeToggle.checked && isRecording) {
+            mediaRecorder.stop();
         }
     });
 
-    socket.on('agent_response_audio', (audioData) => {
-        playAgentAudio(audioData);
+    // ---------- VOICE RECORDING LOGIC ----------
+    micButton.addEventListener('click', async () => {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = handleVoiceStop;
+                
+                mediaRecorder.start();
+                isRecording = true;
+                micButton.classList.add('recording');
+                micButton.innerHTML = '🔴';
+                micStatus.textContent = 'Recording... Click to stop.';
+                
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                addMessage('system', 'Error: Could not access microphone. Please check browser permissions.');
+            }
+        } else {
+            mediaRecorder.stop();
+            // Stop all audio tracks to release microphone
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
     });
 
-    socket.on('error', (data) => {
-        addMessage('system', `Error: ${data.data}`);
+    async function handleVoiceStop() {
+        isRecording = false;
+        micButton.classList.remove('recording');
+        micButton.innerHTML = '🎤';
+        micStatus.textContent = 'Transcribing...';
+
+        if (audioChunks.length === 0) {
+            micStatus.textContent = 'Click the microphone to start recording';
+            return;
+        }
+
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio_file', audioBlob, 'recording.webm');
+        
+        // Clear audio chunks for next recording
+        audioChunks = [];
+
+        try {
+            const response = await fetch('/chat/voice_upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                const errorMessage = errorData?.error || `HTTP error! Status: ${response.status}`;
+                throw new Error(errorMessage);
+            }
+
+            const result = await response.json();
+            micStatus.textContent = 'Click the microphone to start recording';
+
+            if (result.transcription) {
+                addMessage('user', result.transcription);
+                await sendPromptToAgent(result.transcription);
+            } else {
+                throw new Error("Transcription failed to return text.");
+            }
+
+        } catch (err) {
+            console.error('Error processing audio:', err);
+            addMessage('system', `Error: ${err.message}`);
+            micStatus.textContent = 'Processing failed. Please try again.';
+        }
+    }
+
+    // ---------- EVENT LISTENER for Text Chat ----------
+    textInputForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const prompt = promptInput.value.trim();
+        if (!prompt) return;
+
+        addMessage('user', prompt);
+        promptInput.value = '';
+        promptInput.disabled = true;
+
+        await sendPromptToAgent(prompt);
+        
+        promptInput.disabled = false;
+        promptInput.focus();
     });
 
-    // Initialize
-    modeToggle.dispatchEvent(new Event('change'));
+    // Initialize the interface
+    if (micStatus) {
+        micStatus.textContent = 'Click the microphone to start recording';
+    }
+    if (promptInput) {
+        promptInput.focus();
+    }
 });
