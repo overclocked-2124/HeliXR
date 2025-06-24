@@ -1,75 +1,48 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Dashboard analytics script loaded');
-    let lineChart, pieChart, radarChart;
-    let dataCounter = 0;
-    
+    // Declare chart variables
+    let lineChart, pieChart, phChart; // Changed radarChart to phChart
+
     // Expected color value (adjust as needed)
     const EXPECTED_COLOR = [255, 200, 100]; // RGB values for expected color
-    
+
     function initCharts() {
         initLineChart();
         initPieChart();
-        initRadarChart();
+        initPhChart(); // Changed from initRadarChart
     }
 
     function initLineChart() {
-    const ctx = document.getElementById('lineChart').getContext('2d');
-    lineChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
+        const ctx = document.getElementById('lineChart').getContext('2d');
+        lineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
                     label: 'Environment Temp (°C)',
                     data: [],
                     borderColor: '#ff6b6b',
-                    backgroundColor: 'transparent',
+                    backgroundColor: 'rgba(255, 107, 107, 0.1)',
                     fill: true,
                     tension: 0.4,
-                },
-                {
+                }, {
                     label: 'Sensor Temp (°C)',
                     data: [],
                     borderColor: '#74b9ff',
-                    backgroundColor: 'transparent',
+                    backgroundColor: 'rgba(116, 185, 255, 0.1)',
                     fill: true,
                     tension: 0.4,
-                }
-            ]
-        },
+                }]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 13
-                            }
-                        }
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
-                },
+                plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } },
                 scales: {
-                    y: {
-                        beginAtZero: false,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        }
-                    }
+                    y: { beginAtZero: false, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+                    x: { grid: { display: false } }
                 },
-                animation: {
-                    duration: 500
-                }
+                animation: { duration: 500 }
             }
         });
     }
@@ -77,83 +50,96 @@ document.addEventListener('DOMContentLoaded', () => {
     function initPieChart() {
         const ctx = document.getElementById('pieChart').getContext('2d');
         pieChart = new Chart(ctx, {
-            // ... your existing pie chart config ...
+            type: 'doughnut',
+            data: {
+                labels: ['Environment Humidity (%)', 'Dry Air (%)'],
+                datasets: [{
+                    data: [0, 100],
+                    backgroundColor: ['#36a2eb', '#e9ecef'],
+                    borderColor: ['#ffffff'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                cutout: '70%'
+            }
         });
     }
 
-    function initRadarChart() {
-        const ctx = document.getElementById('radarChart').getContext('2d');
-        radarChart = new Chart(ctx, {
-            // ... your existing radar chart config ...
+    // --- NEW: pH LINE CHART INITIALIZATION (replaces radar chart) ---
+    function initPhChart() {
+        const ctx = document.getElementById('phChart').getContext('2d');
+        phChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'pH Level',
+                    data: [],
+                    borderColor: '#84fab0', // Green color
+                    backgroundColor: 'rgba(132, 250, 176, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }, // Hide legend for single-line chart
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        suggestedMin: 6, // Set a reasonable min/max for pH
+                        suggestedMax: 8,
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    x: { grid: { display: false } }
+                },
+                animation: { duration: 500 }
+            }
         });
     }
-    
-    // Calculate color difference (0-100%)
-    function calculateColorDifference(current, expected) {
-        if (!current || !expected || current.length !== 3 || expected.length !== 3) return 0;
-        
-        let diff = 0;
-        for (let i = 0; i < 3; i++) {
-            diff += Math.abs(current[i] - expected[i]);
-        }
-        return Math.min(100, Math.round((diff / 765) * 100));
-    }
-    
+
+    // --- REMOVED: calculateColorDifference function is no longer needed ---
+
     // Convert RGB array to CSS color
     function rgbToCss(rgb) {
         if (!rgb || rgb.length !== 3) return 'rgb(240, 240, 240)';
         return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
     }
-    
-    // Update color comparison display
+
+    // --- MODIFIED: Update color comparison display (difference part removed) ---
     function updateColorComparison(currentRGB) {
-        // Update current color display
         const currentColorElement = document.getElementById('currentColor');
         const currentColorValue = document.getElementById('currentColorValue');
         const expectedColorElement = document.getElementById('expectedColor');
         const expectedColorValue = document.getElementById('expectedColorValue');
-        const differenceElement = document.getElementById('colorDifference');
-        const fillElement = document.getElementById('differenceFill');
-        
+
         if (currentColorElement && currentColorValue) {
             currentColorElement.style.backgroundColor = rgbToCss(currentRGB);
-            currentColorValue.textContent = `RGB: ${currentRGB[0]}, ${currentRGB[1]}, ${currentRGB[2]}`;
+            currentColorValue.textContent = `RGB: ${currentRGB.join(', ')}`;
         }
-        
+
         if (expectedColorElement && expectedColorValue) {
             expectedColorElement.style.backgroundColor = rgbToCss(EXPECTED_COLOR);
-            expectedColorValue.textContent = `RGB: ${EXPECTED_COLOR[0]}, ${EXPECTED_COLOR[1]}, ${EXPECTED_COLOR[2]}`;
-        }
-        
-        if (differenceElement && fillElement) {
-            const difference = calculateColorDifference(currentRGB, EXPECTED_COLOR);
-            differenceElement.textContent = `${difference}%`;
-            fillElement.style.width = `${difference}%`;
-            
-            // Set status color
-            if (difference < 20) {
-                fillElement.style.background = '#4CAF50';
-            } else if (difference < 50) {
-                fillElement.style.background = '#FF9800';
-            } else {
-                fillElement.style.background = '#F44336';
-            }
+            expectedColorValue.textContent = `RGB: ${EXPECTED_COLOR.join(', ')}`;
         }
     }
 
-
-    
-
     function fetchData() {
-        console.log('Fetching data from API...');
         fetch('/api/sensor-data')
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json().then(err => { throw new Error(err.error || `HTTP error! status: ${response.status}`) });
                 }
                 return response.json();
             })
             .then(data => {
+                const errorElement = document.getElementById('errorMessage');
+                if (errorElement) errorElement.style.display = 'none';
                 updateDashboard({
                     env_temp: data.env_temp || 0,
                     env_humidity: data.env_humidity || 0,
@@ -168,48 +154,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error loading sensor data:', err);
                 const errorElement = document.getElementById('errorMessage');
                 if (errorElement) {
-                    errorElement.textContent = `Error: ${err.message}`;
+                    errorElement.textContent = `Data Fetch Error: ${err.message}. Retrying...`;
                     errorElement.style.display = 'block';
-                    setTimeout(() => {
-                        errorElement.style.display = 'none';
-                    }, 5000);
                 }
             });
-            
     }
 
-        function updateDashboard(data) {
-        
-        console.log('Updating dashboard with data:', data);
-        
-        
+    function updateDashboard(data) {
         // Update card values
-        document.getElementById('tempValue').textContent = `${data.temperature}°C`;
-        document.getElementById('humidityValue').textContent = `${data.humidity}%`;
+        document.getElementById('tempValue').textContent = `${data.temperature.toFixed(1)}°C`;
+        document.getElementById('humidityValue').textContent = `${data.humidity.toFixed(1)}%`;
         document.getElementById('lightValue').textContent = `${data.light} lx`;
         document.getElementById('phValue').textContent = data.ph.toFixed(1);
-        
+
         // Update color comparison
         if (data.color_rgb) {
             updateColorComparison(data.color_rgb);
         }
-        
-        // Update line chart
-       
-            if (lineChart.data.labels.length >= 15) {
-                lineChart.data.labels.shift();
-                lineChart.data.datasets[0].data.shift();
-                lineChart.data.datasets[1].data.shift();
-            }
 
-            lineChart.data.labels.push(`Data ${dataCounter++}`);
+        const MAX_DATA_POINTS = 20;
+        const currentTime = new Date().toLocaleTimeString();
+
+        // 1. Update Line Chart
+        if (lineChart) {
+            if (lineChart.data.labels.length >= MAX_DATA_POINTS) {
+                lineChart.data.labels.shift();
+                lineChart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+            lineChart.data.labels.push(currentTime);
             lineChart.data.datasets[0].data.push(data.env_temp);
             lineChart.data.datasets[1].data.push(data.temperature);
-            lineChart.update();
-        
+            lineChart.update('none');
+        }
+
+        // 2. Update Pie Chart
+        if (pieChart) {
+            pieChart.data.datasets[0].data[0] = data.env_humidity;
+            pieChart.data.datasets[0].data[1] = 100 - data.env_humidity;
+            pieChart.update('none');
+        }
+
+        // 3. Update pH Chart (replaces radar chart)
+        if (phChart) {
+            if (phChart.data.labels.length >= MAX_DATA_POINTS) {
+                phChart.data.labels.shift();
+                phChart.data.datasets[0].data.shift();
+            }
+            phChart.data.labels.push(currentTime);
+            phChart.data.datasets[0].data.push(data.ph);
+            phChart.update('none');
+        }
     }
-    
-    // Helper function to convert RGB to light intensity
+
     function rgbToLight(rgb) {
         if (!rgb || rgb.length !== 3) return 0;
         return Math.round((rgb[0] + rgb[1] + rgb[2]) / 3);
@@ -218,15 +214,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize and start data updates
     try {
         initCharts();
-        fetchData(); // Initial load
-        setInterval(fetchData, 5000); // Periodic updates
+        fetchData();
+        setInterval(fetchData, 5000);
     } catch (error) {
         console.error('Initialization error:', error);
         const errorElement = document.getElementById('errorMessage');
         if (errorElement) {
-            errorElement.textContent = `Initialization error: ${error.message}`;
+            errorElement.textContent = `Dashboard Initialization Error: ${error.message}`;
             errorElement.style.display = 'block';
         }
     }
-
 });

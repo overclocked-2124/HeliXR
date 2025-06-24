@@ -6,14 +6,11 @@
 <div class="analytics-container">
     <div class="header">
         <h1><i class="fas fa-chart-line"></i> Sensor Analytics Dashboard</h1>
-        <!-- Add update status elements -->
         <div class="update-status">
          <div id="errorMessage" style="color: red; display: none;"></div>
-
         </div>
     </div>
 
-    <!-- Add error display element -->
     <div id="errorMessage" class="alert alert-danger d-none"></div>
 
     <div class="sensor-stats">
@@ -43,18 +40,17 @@
             </div>
             <div class="stat-content">
                 <div class="stat-value" id="lightValue">780 lx</div>
-                <div class="stat-label">Light</div>
+                <div class="stat-label">Light Intensity</div>
             </div>
         </div>
         
-        <!-- Change from Pressure to pH Level -->
-        <div class="stat-card ph-stat">  <!-- Changed class to ph-stat -->
+        <div class="stat-card ph-stat">
             <div class="stat-icon">
-                <i class="fas fa-flask"></i>  <!-- Changed icon to flask -->
+                <i class="fas fa-flask"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value" id="phValue">7.0</div>  <!-- Changed id to phValue -->
-                <div class="stat-label">pH Level</div>  <!-- Changed label -->
+                <div class="stat-value" id="phValue">7.0</div>
+                <div class="stat-label">pH Level</div>
             </div>
         </div>
     </div>
@@ -69,7 +65,6 @@
             </div>
         </div>
         
-        <!-- NEW: Color Comparison Display -->
         <div class="chart-card">
             <div class="chart-header">
                 <h2><i class="fas fa-palette"></i> Solution Color Analysis</h2>
@@ -87,13 +82,7 @@
                         <div class="color-value" id="expectedColorValue">RGB: 255, 200, 100</div>
                     </div>
                 </div>
-                <div class="color-difference">
-                    <h3>Color Difference</h3>
-                    <div class="difference-value" id="colorDifference">0%</div>
-                    <div class="difference-bar">
-                        <div class="difference-fill" id="differenceFill"></div>
-                    </div>
-                </div>
+                <!-- ===== CHANGE 1: The Color Difference DIV below has been removed ===== -->
             </div>
         </div>
         
@@ -107,11 +96,12 @@
         </div>
         
         <div class="chart-card">
+            <!-- ===== CHANGE 2: The title and canvas ID for the old radar chart have been updated ===== -->
             <div class="chart-header">
-                <h2><i class="fas fa-wave-square"></i> Light Intensity</h2>
+                <h2><i class="fas fa-stream"></i> pH Level Over Time</h2>
             </div>
             <div class="chart-container">
-                <canvas id="radarChart"></canvas>
+                <canvas id="phChart"></canvas> <!-- Changed ID from radarChart to phChart -->
             </div>
         </div>
     </div>
