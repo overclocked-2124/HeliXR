@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from bson.json_util import dumps
 from datetime import datetime
-
+import uuid
 from HeliXR import app, db, bcrypt, socketio
 from HeliXR.forms import RegistrationForm, LoginForm
 from HeliXR.models import User
