@@ -287,7 +287,6 @@ def gemini_chat():
 @app.route('/chat/voice_upload', methods=['POST'])
 def handle_voice_upload():
     """Receives an audio file, saves it, transcribes it, and returns the text."""
-    # This function uses Google for Speech-to-Text and is unchanged.
     if 'audio_file' not in request.files:
         return jsonify({"error": "No audio file part in the request"}), 400
 
@@ -296,19 +295,34 @@ def handle_voice_upload():
         return jsonify({"error": "No selected file"}), 400
 
     if file:
-        filename = f"recording_{uuid.uuid4().hex}.webm"
+        filename = f"recording_{uuid.uuid4().hex}.mp3"
         filepath = os.path.join(app.config['TEMP_FOLDER'], filename)
         
         try:
             file.save(filepath)
             
+            # Upload file
             myfile = client.files.upload(file=filepath)
+            
+            # Wait for file to become ACTIVE - FIX HERE
+            while myfile.state.name == "PROCESSING":
+                print(f"File {myfile.name} is still processing... waiting")
+                time.sleep(2)
+                myfile = client.files.get(name=myfile.name)  # Use name= parameter
+            
+            # Check if file is ready
+            if myfile.state.name != "ACTIVE":
+                raise Exception(f"File failed to process. State: {myfile.state.name}")
+            
+            print(f"File {myfile.name} is now ACTIVE and ready for use")
+            
+            # Now transcribe
             prompt = 'Transcribe the following audio.'
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=[prompt, myfile]
             )
-            
+            # Cleanup
             os.remove(filepath)
             client.files.delete(name=myfile.name)
             
@@ -320,6 +334,13 @@ def handle_voice_upload():
             print(f"An error occurred during transcription: {e}")
             if os.path.exists(filepath):
                 os.remove(filepath)
+            # Try to cleanup the uploaded file if it exists
+            try:
+                if 'myfile' in locals():
+                    client.files.delete(name=myfile.name)
+            except:
+                pass
             return jsonify({"error": f"Failed to process audio: {str(e)}"}), 500
 
     return jsonify({"error": "An unknown error occurred"}), 500
+
