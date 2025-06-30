@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import random
+import re
 import traceback  # Add to top of file
 from pymongo import errors as mongo_errors
 from functools import wraps
@@ -61,6 +62,73 @@ def on_connect():
 def on_disconnect():
     app.logger.info('Client disconnected')
 
+# --- VALVE CONTROL FUNCTIONS ---
+def detect_valve_command(prompt: str) -> dict:
+    """Detects valve control commands in user prompts"""
+    prompt_lower = prompt.lower()
+    number_map = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        '1': 1, '2': 2, '3': 3, '4': 4, '5': 5
+    }
+    
+    # Patterns to detect valve commands
+    patterns = [
+        (r'(open|start|activate).*?valve\s*(\d+|one|two|three|four|five)', 'open'),
+        (r'(close|stop|shut\s*down|deactivate).*?valve\s*(\d+|one|two|three|four|five)', 'close'),
+        (r'valve\s*(\d+|one|two|three|four|five).*?(open|start|activate)', 'open'),
+        (r'valve\s*(\d+|one|two|three|four|five).*?(close|stop|shut\s*down|deactivate)', 'close')
+    ]
+    
+    for pattern, action in patterns:
+        match = re.search(pattern, prompt_lower)
+        if match:
+            valve_id = match.group(2) if action in ['open', 'close'] else match.group(1)
+            valve_num = number_map.get(valve_id.lower())
+            if valve_num and 1 <= valve_num <= 5:
+                return {
+                    'action': action,
+                    'valve_number': valve_num,
+                    'value': 0 if action == 'open' else 180                  
+                }
+            else:
+                app.logger.warning(f"Invalid valve number detected: {valve_id} in prompt: {prompt}")
+    # If no command detected, return None
+            app.logger.info(f"Detected valve command: {action} valve {valve_num}")
+    return None
+
+def update_valve_state(valve_number: int, action: str, value: int):
+    """Updates valve state in MongoDB"""
+    try:
+        # Get the latest document
+        latest_doc = app.mongo_collection.find_one(sort=[("timestamp", -1)])
+        
+        if not latest_doc:
+            app.logger.error("No documents found in collection")
+            return False, "No recent data document found"
+        
+        
+        # Create update path
+        update_path = f"actuator_data.servo_rotations_deg.servo_{valve_number}"
+        
+        # Perform atomic update
+        result = app.mongo_collection.update_one(
+            {"_id": latest_doc["_id"]},
+            {"$set": {update_path: value}}
+        )
+        
+        app.logger.info(f"Valve update: valve={valve_number}, action={action}, "
+                        f"matched={result.matched_count}, modified={result.modified_count}")
+        
+        if result.modified_count == 1:
+            return True, f"Valve {valve_number} {action}ed successfully"
+        
+        return False, f"Update failed (modified_count: {result.modified_count})"
+    
+    except Exception as e:
+        error_msg = f"Valve update error: {str(e)}"
+        app.logger.error(error_msg)
+        app.logger.error(traceback.format_exc())
+        return False, error_msg
 
 # Folder for temporary user voice uploads
 TEMP_FOLDER = 'temp_audio'
@@ -193,6 +261,8 @@ def latest_sensor_data():
             current_app.logger.info(f"✅ Found document with ID: {latest.get('_id')}")
             sauce_data = latest.get("sauce_sensor_data", {})
             env_data = latest.get("environment_data", {}) 
+            actuator_data = latest.get("actuator_data", {}).get("servo_rotations_deg", {})
+
             return jsonify({
                 "temperature": sauce_data.get("temperature_c", 0),
                 "humidity": sauce_data.get("humidity_pct", 0),
@@ -200,7 +270,15 @@ def latest_sensor_data():
                 "color_rgb": sauce_data.get("color_rgb", [0,0,0]),
 
                 "env_temp": env_data.get("temperature_c", 0),
-                "env_humidity": env_data.get("humidity_pct", 0)
+                "env_humidity": env_data.get("humidity_pct", 0),
+
+                "valve_status": {
+                "valve_1": actuator_data.get("servo_1", 0),
+                "valve_2": actuator_data.get("servo_2", 0),
+                "valve_3": actuator_data.get("servo_3", 0),
+                "valve_4": actuator_data.get("servo_4", 0),
+                "valve_5": actuator_data.get("servo_5", 0)
+            }
             })
         else:
             current_app.logger.warning("⚠️ No documents found in collection")
@@ -240,48 +318,67 @@ def gemini_chat():
     if not prompt:
         return jsonify({'error': 'No prompt provided'}), 400
 
+    # Check for valve command first
+    valve_cmd = detect_valve_command(prompt)
+    if valve_cmd:
+        app.logger.info(f"Valve command detected: {valve_cmd}")
+        
+        # Update valve state in MongoDB
+        success, message = update_valve_state(
+            valve_cmd['valve_number'],
+            valve_cmd['action'],
+            valve_cmd['value']
+        )
+        
+        # Prepare response
+        if success:
+            reply = message
+        else:
+            reply = f" {message}"
+        
+        # Generate TTS audio if model is available
+        audio_url = None
+        if tts_model:
+            try:
+                wav_tensor = tts_model.generate(reply)
+                audio_filename = f"response_{uuid.uuid4().hex}.wav"
+                audio_filepath = os.path.join(AUDIO_FOLDER, audio_filename)
+                ta.save(audio_filepath, wav_tensor, tts_model.sr)
+                audio_url = url_for('static', filename=f'audio_responses/{audio_filename}')
+            except Exception as tts_error:
+                app.logger.error(f"TTS failed: {str(tts_error)}")
+        
+        return jsonify({
+            'reply': reply,
+            'audio_url': audio_url,
+            'command_executed': True
+        })
+    
+    # --- ORIGINAL GEMINI PROCESSING ---
     try:
-        # 1. Get text response from chat model (this part is unchanged)
         text_response = chat.send_message(prompt)
         text_reply = text_response.text
 
-        # 2. Check if the Chatterbox TTS model loaded successfully at startup
-        if tts_model is None:
-            print("TTS model not available. Returning text-only response.")
-            return jsonify({'reply': text_reply})
-
-        # 3. Generate audio using the local Chatterbox model
-        print(f"Generating audio for: '{text_reply[:50]}...'")
-        wav_tensor = tts_model.generate(text_reply)
+        # Generate TTS audio if model is available
+        audio_url = None
+        if tts_model:
+            try:
+                wav_tensor = tts_model.generate(text_reply)
+                audio_filename = f"response_{uuid.uuid4().hex}.wav"
+                audio_filepath = os.path.join(AUDIO_FOLDER, audio_filename)
+                ta.save(audio_filepath, wav_tensor, tts_model.sr)
+                audio_url = url_for('static', filename=f'audio_responses/{audio_filename}')
+            except Exception as tts_error:
+                app.logger.error(f"TTS failed: {str(tts_error)}")
         
-        # 4. Save the audio tensor to a .wav file
-        audio_filename = f"response_{uuid.uuid4().hex}.wav" # Save as .wav
-        audio_filepath = os.path.join(AUDIO_FOLDER, audio_filename)
-        
-        # Use torchaudio to save the file
-        ta.save(audio_filepath, wav_tensor, tts_model.sr)
-        print(f"Audio saved to {audio_filepath}")
-
-        # 5. Create a URL for the client to access the file
-        audio_url = url_for('static', filename=f'audio_responses/{audio_filename}', _external=False)
-
-        # 6. Send the text reply and the audio URL to the client
         return jsonify({
             'reply': text_reply,
             'audio_url': audio_url
         })
 
     except Exception as e:
-        print(f"An error occurred in gemini_chat: {e}")
-        traceback.print_exc()
-        # Fallback to text-only response if TTS fails for any reason
-        try:
-            # Still try to get the text response even if TTS failed
-            if 'text_reply' not in locals():
-                 text_reply = chat.send_message(prompt).text
-            return jsonify({'reply': text_reply, 'error_details': f"TTS generation failed: {str(e)}"})
-        except Exception as fallback_e:
-            return jsonify({'reply': f"A critical error occurred. Please try again. (Error: {str(fallback_e)})"})
+        app.logger.error(f"Gemini chat error: {str(e)}")
+        return jsonify({'reply': f"An error occurred: {str(e)}"}), 500
 
 
 @app.route('/chat/voice_upload', methods=['POST'])
@@ -344,3 +441,24 @@ def handle_voice_upload():
 
     return jsonify({"error": "An unknown error occurred"}), 500
 
+# --- DIRECT VALVE CONTROL API FOR DEBUGGING ---
+@app.route('/api/control-valve', methods=['POST'])
+def direct_valve_control():
+    data = request.json
+    valve_number = data.get('valve_number')
+    action = data.get('action')
+    
+    if not valve_number or not action:
+        return jsonify({"error": "Missing valve_number or action"}), 400
+    
+    if action not in ['open', 'close']:
+        return jsonify({"error": "Invalid action. Use 'open' or 'close'"}), 400
+    
+    value = 0 if action == 'open' else 180
+    
+    success, message = update_valve_state(valve_number, action, value)
+    
+    if success:
+        return jsonify({"status": "success", "message": message})
+    else:
+        return jsonify({"status": "error", "message": message}), 500
