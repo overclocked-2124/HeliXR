@@ -96,16 +96,26 @@ def detect_valve_command(prompt: str) -> dict:
             app.logger.info(f"Detected valve command: {action} valve {valve_num}")
     return None
 
+      
 def detect_mixer_command(prompt: str) -> dict:
-    """Detects mixer speed commands in user prompts"""
+    """Detects mixer speed commands in user prompts with more flexible patterns."""
     prompt_lower = prompt.lower()
     
-    # Pattern to detect mixer speed commands (e.g., "set mixer speed to 100 rpm")
-    pattern = r'(set|change|adjust|update).*?mixer.*?speed.*?to\s*(\d+)'
+    # More flexible pattern: looks for "mixer" and a number. 
+    # Keywords like "speed", "set", "to", "rpm" are optional.
+    # Pattern explanation:
+    # (set|change|adjust|update)?   -> Optional verb at the start
+    # \s*mixer\s*                  -> The word "mixer" with optional spaces
+    # (speed\s*)?                  -> The word "speed" is optional
+    # (to\s*)?                     -> The word "to" is optional
+    # (\d+)                        -> Captures the speed number
+    pattern = r'(?:set|change|adjust|update)?\s*mixer\s*(?:speed\s*)?(?:to\s*)?(\d+)'
     
     match = re.search(pattern, prompt_lower)
     if match:
-        speed = int(match.group(2))
+        # The speed will be in the first (and only) capturing group
+        speed = int(match.group(1))
+        app.logger.info(f"Detected mixer command: set speed to {speed}")
         return {
             'action': 'set_speed',
             'speed': speed
@@ -114,11 +124,13 @@ def detect_mixer_command(prompt: str) -> dict:
     # If no command detected, return None
     return None
 
+    
+
 def update_mixer_speed(speed: int):
     """Creates a new MongoDB document to reflect the updated mixer speed."""
     try:
         # Get the latest document to use as a template
-        latest_doc = current_app.mongo_collection.find_one(sort=[("timestamp", -1)])
+        latest_doc = current_app.mongo_collection.find_one(sort=[("_id", -1)])
         
         if not latest_doc:
             return False, "No existing data to base command on."
@@ -127,9 +139,13 @@ def update_mixer_speed(speed: int):
         new_doc = latest_doc.copy()
         del new_doc['_id']  # Remove old ID to allow insertion of a new doc
         
-        # Update the mixer speed and timestamp
+        # --- ROBUST UPDATE ---
+        # Ensure 'actuator_data' key exists before trying to update it.
+        if 'actuator_data' not in new_doc:
+            new_doc['actuator_data'] = {}
+            
         new_doc['actuator_data']['mixer_speed_rpm'] = speed
-        new_doc['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+        new_doc['timestamp'] = datetime.utcnow()
 
         # Insert the new document
         result = current_app.mongo_collection.insert_one(new_doc)
@@ -150,7 +166,7 @@ def update_valve_state(valve_number: int, action: str, value: int):
     """Creates a new MongoDB document to reflect the updated valve state."""
     try:
         # Get the latest document to use as a template
-        latest_doc = current_app.mongo_collection.find_one(sort=[("timestamp", -1)])
+        latest_doc = current_app.mongo_collection.find_one(sort=[("_id", -1)])
         
         if not latest_doc:
             return False, "No existing data to base command on."
@@ -162,7 +178,7 @@ def update_valve_state(valve_number: int, action: str, value: int):
         # Update the valve state and timestamp
         servo_name = f"servo_{valve_number}"
         new_doc['actuator_data']['servo_rotations_deg'][servo_name] = value
-        new_doc['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+        new_doc['timestamp'] = datetime.utcnow()
 
         # Insert the new document
         result = current_app.mongo_collection.insert_one(new_doc)
@@ -304,13 +320,14 @@ def latest_sensor_data():
         current_app.logger.info(f"📁 Using database: {db_name}, collection: {collection_name}")
         
         # Find the latest document
-        latest = current_app.mongo_collection.find_one(sort=[("timestamp", -1)])
+        latest = current_app.mongo_collection.find_one(sort=[("_id", -1)])
         
         if latest:
             current_app.logger.info(f"✅ Found document with ID: {latest.get('_id')}")
             sauce_data = latest.get("sauce_sensor_data", {})
             env_data = latest.get("environment_data", {}) 
-            actuator_data = latest.get("actuator_data", {}).get("servo_rotations_deg", {})
+            actuator_data = latest.get("actuator_data", {})
+            servo_data = actuator_data.get("servo_rotations_deg", {})
 
             return jsonify({
                 "temperature": sauce_data.get("temperature_c", 0),
@@ -321,13 +338,15 @@ def latest_sensor_data():
                 "env_temp": env_data.get("temperature_c", 0),
                 "env_humidity": env_data.get("humidity_pct", 0),
 
+                "mixer_speed_rpm": actuator_data.get("mixer_speed_rpm", 0),
+
                 "valve_status": {
-                "valve_1": actuator_data.get("servo_1", 0),
-                "valve_2": actuator_data.get("servo_2", 0),
-                "valve_3": actuator_data.get("servo_3", 0),
-                "valve_4": actuator_data.get("servo_4", 0),
-                "valve_5": actuator_data.get("servo_5", 0)
-            }
+                    "valve_1": servo_data.get("servo_1", 0),
+                    "valve_2": servo_data.get("servo_2", 0),
+                    "valve_3": servo_data.get("servo_3", 0),
+                    "valve_4": servo_data.get("servo_4", 0),
+                    "valve_5": servo_data.get("servo_5", 0)
+                }
             })
         else:
             current_app.logger.warning("⚠️ No documents found in collection")
@@ -367,27 +386,22 @@ def gemini_chat():
     if not prompt:
         return jsonify({'error': 'No prompt provided'}), 400
 
-    # Check for valve command first
+    # --- RESTRUCTURED COMMAND LOGIC ---
+    # Create a clear priority: Valve > Mixer > General Chat
+
     valve_cmd = detect_valve_command(prompt)
     mixer_cmd = detect_mixer_command(prompt)
 
+    # 1. Check for valve command first
     if valve_cmd:
         app.logger.info(f"Valve command detected: {valve_cmd}")
-        
-        # Update valve state in MongoDB
         success, message = update_valve_state(
             valve_cmd['valve_number'],
             valve_cmd['action'],
             valve_cmd['value']
         )
+        reply = message if success else f"Error: {message}"
         
-        # Prepare response
-        if success:
-            reply = message
-        else:
-            reply = f" {message}"
-        
-        # Generate TTS audio if model is available
         audio_url = None
         if tts_model:
             try:
@@ -405,19 +419,12 @@ def gemini_chat():
             'command_executed': True
         })
 
-    if mixer_cmd:
+    # 2. If no valve command, check for mixer command
+    elif mixer_cmd:
         app.logger.info(f"Mixer command detected: {mixer_cmd}")
-        
-        # Update mixer speed in MongoDB
         success, message = update_mixer_speed(mixer_cmd['speed'])
+        reply = message if success else f"Error: {message}"
         
-        # Prepare response
-        if success:
-            reply = message
-        else:
-            reply = f" {message}"
-        
-        # Generate TTS audio if model is available
         audio_url = None
         if tts_model:
             try:
@@ -435,32 +442,32 @@ def gemini_chat():
             'command_executed': True
         })
     
-    # --- ORIGINAL GEMINI PROCESSING ---
-    try:
-        text_response = chat.send_message(prompt)
-        text_reply = text_response.text
+    # 3. If no commands detected, proceed with general AI chat
+    else:
+        try:
+            text_response = chat.send_message(prompt)
+            text_reply = text_response.text
 
-        # Generate TTS audio if model is available
-        audio_url = None
-        if tts_model:
-            try:
-                wav_tensor = tts_model.generate(text_reply)
-                audio_filename = f"response_{uuid.uuid4().hex}.wav"
-                audio_filepath = os.path.join(AUDIO_FOLDER, audio_filename)
-                ta.save(audio_filepath, wav_tensor, tts_model.sr)
-                audio_url = url_for('static', filename=f'audio_responses/{audio_filename}')
-            except Exception as tts_error:
-                app.logger.error(f"TTS failed: {str(tts_error)}")
-        
-        return jsonify({
-            'reply': text_reply,
-            'audio_url': audio_url
-        })
+            audio_url = None
+            if tts_model:
+                try:
+                    wav_tensor = tts_model.generate(text_reply)
+                    audio_filename = f"response_{uuid.uuid4().hex}.wav"
+                    audio_filepath = os.path.join(AUDIO_FOLDER, audio_filename)
+                    ta.save(audio_filepath, wav_tensor, tts_model.sr)
+                    audio_url = url_for('static', filename=f'audio_responses/{audio_filename}')
+                except Exception as tts_error:
+                    app.logger.error(f"TTS failed: {str(tts_error)}")
+            
+            return jsonify({
+                'reply': text_reply,
+                'audio_url': audio_url,
+                'command_executed': False # Indicate no specific command was run
+            })
 
-    except Exception as e:
-        app.logger.error(f"Gemini chat error: {str(e)}")
-        return jsonify({'reply': f"An error occurred: {str(e)}"}), 500
-
+        except Exception as e:
+            app.logger.error(f"Gemini chat error: {str(e)}")
+            return jsonify({'reply': f"An error occurred: {str(e)}"}), 500
 
 @app.route('/chat/voice_upload', methods=['POST'])
 def handle_voice_upload():
