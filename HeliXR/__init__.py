@@ -25,3 +25,7 @@ socketio = SocketIO(app)
 
 
 from HeliXR import routes
+
+# Create database tables for SQLAlchemy
+with app.app_context():
+    db.create_all()

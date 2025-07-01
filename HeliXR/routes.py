@@ -96,38 +96,87 @@ def detect_valve_command(prompt: str) -> dict:
             app.logger.info(f"Detected valve command: {action} valve {valve_num}")
     return None
 
-def update_valve_state(valve_number: int, action: str, value: int):
-    """Updates valve state in MongoDB"""
+def detect_mixer_command(prompt: str) -> dict:
+    """Detects mixer speed commands in user prompts"""
+    prompt_lower = prompt.lower()
+    
+    # Pattern to detect mixer speed commands (e.g., "set mixer speed to 100 rpm")
+    pattern = r'(set|change|adjust|update).*?mixer.*?speed.*?to\s*(\d+)'
+    
+    match = re.search(pattern, prompt_lower)
+    if match:
+        speed = int(match.group(2))
+        return {
+            'action': 'set_speed',
+            'speed': speed
+        }
+
+    # If no command detected, return None
+    return None
+
+def update_mixer_speed(speed: int):
+    """Creates a new MongoDB document to reflect the updated mixer speed."""
     try:
-        # Get the latest document
-        latest_doc = app.mongo_collection.find_one(sort=[("timestamp", -1)])
+        # Get the latest document to use as a template
+        latest_doc = current_app.mongo_collection.find_one(sort=[("timestamp", -1)])
         
         if not latest_doc:
-            app.logger.error("No documents found in collection")
-            return False, "No recent data document found"
+            return False, "No existing data to base command on."
+
+        # Create a new document by copying the latest one
+        new_doc = latest_doc.copy()
+        del new_doc['_id']  # Remove old ID to allow insertion of a new doc
         
+        # Update the mixer speed and timestamp
+        new_doc['actuator_data']['mixer_speed_rpm'] = speed
+        new_doc['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+
+        # Insert the new document
+        result = current_app.mongo_collection.insert_one(new_doc)
         
-        # Create update path
-        update_path = f"actuator_data.servo_rotations_deg.servo_{valve_number}"
+        if result.inserted_id:
+            current_app.logger.info(f"New document created for mixer speed update. ID: {result.inserted_id}")
+            return True, f"Mixer speed set to {speed} RPM successfully."
+        else:
+            return False, "Failed to create new document for mixer speed command."
+
+    except Exception as e:
+        error_msg = f"Mixer speed update error: {str(e)}"
+        current_app.logger.error(error_msg)
+        current_app.logger.error(traceback.format_exc())
+        return False, error_msg
+
+def update_valve_state(valve_number: int, action: str, value: int):
+    """Creates a new MongoDB document to reflect the updated valve state."""
+    try:
+        # Get the latest document to use as a template
+        latest_doc = current_app.mongo_collection.find_one(sort=[("timestamp", -1)])
         
-        # Perform atomic update
-        result = app.mongo_collection.update_one(
-            {"_id": latest_doc["_id"]},
-            {"$set": {update_path: value}}
-        )
-        
-        app.logger.info(f"Valve update: valve={valve_number}, action={action}, "
-                        f"matched={result.matched_count}, modified={result.modified_count}")
-        
-        if result.modified_count == 1:
-            return True, f"Valve {valve_number} {action}ed successfully"
-        
-        return False, f"Update failed (modified_count: {result.modified_count})"
-    
+        if not latest_doc:
+            return False, "No existing data to base command on."
+
+        # Create a new document by copying the latest one
+        new_doc = latest_doc.copy()
+        del new_doc['_id']  # Remove old ID to allow insertion of a new doc
+
+        # Update the valve state and timestamp
+        servo_name = f"servo_{valve_number}"
+        new_doc['actuator_data']['servo_rotations_deg'][servo_name] = value
+        new_doc['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+
+        # Insert the new document
+        result = current_app.mongo_collection.insert_one(new_doc)
+
+        if result.inserted_id:
+            current_app.logger.info(f"New document created for valve update. ID: {result.inserted_id}")
+            return True, f"Valve {valve_number} {action}ed successfully."
+        else:
+            return False, "Failed to create new document for valve command."
+
     except Exception as e:
         error_msg = f"Valve update error: {str(e)}"
-        app.logger.error(error_msg)
-        app.logger.error(traceback.format_exc())
+        current_app.logger.error(error_msg)
+        current_app.logger.error(traceback.format_exc())
         return False, error_msg
 
 # Folder for temporary user voice uploads
@@ -320,6 +369,8 @@ def gemini_chat():
 
     # Check for valve command first
     valve_cmd = detect_valve_command(prompt)
+    mixer_cmd = detect_mixer_command(prompt)
+
     if valve_cmd:
         app.logger.info(f"Valve command detected: {valve_cmd}")
         
@@ -329,6 +380,36 @@ def gemini_chat():
             valve_cmd['action'],
             valve_cmd['value']
         )
+        
+        # Prepare response
+        if success:
+            reply = message
+        else:
+            reply = f" {message}"
+        
+        # Generate TTS audio if model is available
+        audio_url = None
+        if tts_model:
+            try:
+                wav_tensor = tts_model.generate(reply)
+                audio_filename = f"response_{uuid.uuid4().hex}.wav"
+                audio_filepath = os.path.join(AUDIO_FOLDER, audio_filename)
+                ta.save(audio_filepath, wav_tensor, tts_model.sr)
+                audio_url = url_for('static', filename=f'audio_responses/{audio_filename}')
+            except Exception as tts_error:
+                app.logger.error(f"TTS failed: {str(tts_error)}")
+        
+        return jsonify({
+            'reply': reply,
+            'audio_url': audio_url,
+            'command_executed': True
+        })
+
+    if mixer_cmd:
+        app.logger.info(f"Mixer command detected: {mixer_cmd}")
+        
+        # Update mixer speed in MongoDB
+        success, message = update_mixer_speed(mixer_cmd['speed'])
         
         # Prepare response
         if success:
