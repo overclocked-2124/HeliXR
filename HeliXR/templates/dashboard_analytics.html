@@ -3,6 +3,24 @@
 {% set active_page = 'analytics' %}
 
 {% block main_dashboard_content %}
+<div id="warningPopup" class="warning-popup">
+  <div class="warning-content">
+    <strong>⚠️ Warning!</strong>
+    <p id="warningMessage"></p>
+    <div class="warning-buttons">
+    <button id="warningClose">Close</button>
+    <button id="viewDetailsBtn">View Details</button>
+    </div>
+  </div>
+</div>
+<!-- Alert Popup Container -->
+<div id="alertPopup" class="alert-popup">
+  <div class="alert-content">
+    <span id="alertClose" class="alert-close">&times;</span>
+    <div id="alertMessage"></div>
+  </div>
+</div>
+
 <div class="analytics-container">
     <div class="header">
         <h1><i class="fas fa-chart-line"></i> Sensor Analytics Dashboard</h1>

@@ -3,20 +3,38 @@
 <div class="page1">
     <div class="title-container">
         <div class="title">VOCAL COMMANDS<br>VISUAL OVERSIGHT</div>
-        <div class="subtitle">HeliXR reinvents supplychains. with AR</div>
+        <div class="subtitle">HeliXR reinvents supply chains with AR.</div>
     </div>
     <div class="scrool-container">
         <div class="scroll-line"></div>
         <span class="scroll-text">SCROLL TO DISCOVER</span>
     </div>
 </div>
-<div class="page2">
 
+<div class="page2">
+    <div class="p2-text-content">
+        <h2 class="p2-title">INTERACTIVE DIGITAL TWIN</h2>
+        <p class="p2-subtitle">
+            Visualize your assets in real-time. Our platform provides a high-fidelity 3D representation of your entire operation, from individual valves to the complete production line. Interact, analyze, and command with unprecedented clarity.
+        </p>
+        <div class="model-controls">
+            <button class="control-btn" id="resetView">Reset View</button>
+            <button class="control-btn" id="toggleWireframe">Wireframe</button>
+            <button class="control-btn" id="toggleAnimation">Animation</button>
+        </div>
+    </div>
+    <div id="canvas-container">
+        <div id="loading-spinner">
+            <div class="spinner"></div>
+            <span>Loading 3D Model...</span>
+        </div>
+        <!-- 3D Canvas will be injected here by main.js -->
+    </div>
 </div>
 
-
-
-
-
-
+<!-- Three.js Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock content %}

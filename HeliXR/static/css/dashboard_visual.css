@@ -1,0 +1,100 @@
+/* Main container for the Visual View */
+.visual-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background-color: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Space Grotesk', sans-serif;
+    padding: 20px;
+}
+
+/* --- Model View Section Styling --- */
+.visual-model-view {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #151019 0%, #1a1625 100%);
+    border: 2px solid rgba(236, 78, 32, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    height: 100%;
+}
+
+.model-controls-wrapper {
+    background: rgba(26, 26, 46, 0.9);
+    padding: 1rem;
+    border-bottom: 1px solid rgba(236, 78, 32, 0.2);
+}
+
+.model-controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.control-btn {
+    font-family: "Space Grotesk", sans-serif;
+    background: linear-gradient(45deg, #EC4E20, #DB8A74);
+    color: #151019;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.control-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(236, 78, 32, 0.3);
+    background: linear-gradient(45deg, #DB8A74, #EC4E20);
+}
+
+.control-btn:active {
+    transform: translateY(0);
+}
+
+#visual-canvas-container {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(45deg, #1a1625, #151019);
+}
+
+#visual-loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #FFFFFF;
+    font-family: "Space Grotesk", sans-serif;
+    z-index: 100;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid #EC4E20;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#visual-three-canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+

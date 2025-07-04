@@ -1,37 +1,34 @@
 {% extends "dashboard_template.html" %}
-
 {% set active_page = 'command_view' %}
 
 {% block main_dashboard_content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_command.css') }}">
-
 <div class="command-container">
-    <!-- Sensor Stats Section -->
+    <!-- Stats Section -->
     <div class="command-stats">
         <div class="stat-card temp-stat">
-            <div class="stat-icon"><i class="fas fa-thermometer-half"></i></div>
-            <div class="stat-content">
+            <div class="stat-icon">🌡️</div>
+            <div class="stat-info">
                 <div class="stat-value" id="tempValue">--°C</div>
                 <div class="stat-label">Temperature</div>
             </div>
         </div>
         <div class="stat-card humidity-stat">
-            <div class="stat-icon"><i class="fas fa-tint"></i></div>
-            <div class="stat-content">
+            <div class="stat-icon">💧</div>
+            <div class="stat-info">
                 <div class="stat-value" id="humidityValue">--%</div>
                 <div class="stat-label">Humidity</div>
             </div>
         </div>
         <div class="stat-card light-stat">
-            <div class="stat-icon"><i class="fas fa-sun"></i></div>
-            <div class="stat-content">
+            <div class="stat-icon">💡</div>
+            <div class="stat-info">
                 <div class="stat-value" id="lightValue">-- lx</div>
-                <div class="stat-label">Light Intensity</div>
+                <div class="stat-label">Light</div>
             </div>
         </div>
         <div class="stat-card ph-stat">
-            <div class="stat-icon"><i class="fas fa-flask"></i></div>
-            <div class="stat-content">
+            <div class="stat-icon">⚗️</div>
+            <div class="stat-info">
                 <div class="stat-value" id="phValue">--</div>
                 <div class="stat-label">pH Level</div>
             </div>
@@ -40,13 +37,26 @@
 
     <!-- 3D Model View Section -->
     <div class="command-model-view">
-        3D Model View Placeholder
+        <div class="model-controls-wrapper">
+            <div class="model-controls">
+                <button class="control-btn" id="resetView">Reset View</button>
+                <button class="control-btn" id="toggleWireframe">Wireframe</button>
+                <button class="control-btn" id="toggleAnimation">Animation</button>
+            </div>
+        </div>
+        <div id="command-canvas-container">
+            <div id="command-loading-spinner">
+                <div class="spinner"></div>
+                <span>Loading 3D Model...</span>
+            </div>
+            <!-- 3D Canvas will be injected here -->
+        </div>
     </div>
 
     <!-- Chat Section -->
     <div class="command-chat">
         <div class="chat-header">
-            <h3>AI Assistant</h3>
+            <h3>AI Command Interface</h3>
         </div>
         <div class="chat-display" id="chat-display">
             <div class="message system">
@@ -54,13 +64,17 @@
             </div>
         </div>
         <div class="chat-input-area">
-            <form id="text-input-form" style="width: 100%;">
-                <input type="text" id="prompt-input" placeholder="Ask a question..." autocomplete="off">
-                <button type="submit"><i class="fas fa-paper-plane"></i></button>
+            <form id="text-input-form">
+                <input type="text" id="prompt-input" placeholder="Type your command or question..." autocomplete="off">
+                <button type="submit">Send</button>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Three.js Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard_command.js') }}"></script>
 {% endblock main_dashboard_content %}

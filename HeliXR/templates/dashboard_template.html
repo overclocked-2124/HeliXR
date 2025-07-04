@@ -16,6 +16,7 @@
         <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Roboto:ital,wdth,wght@0,75..100,100..900;1,75..100,100..900&family=Russo+One&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
         <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_template.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/warning_popup.css') }}">
     </head>
 <body>
     <div class="dashboard-container">
@@ -46,5 +47,7 @@
             {% endblock main_dashboard_content %}
         </main>
     </div>
+    {% include '/warning_popup.html' %}
+    <script src="{{ url_for('static', filename='js/warning_popup.js') }}"></script>
 </body>
 </html>

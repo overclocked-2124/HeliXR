@@ -55,3 +55,138 @@
 .page2{
     height: 100vh;
 }
+
+/* Add this to your existing index.css file */
+
+.page2 {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 5%;
+    background: linear-gradient(135deg, #151019 0%, #1a1625 100%);
+}
+
+.p2-text-content {
+    flex: 1;
+    max-width: 45%;
+    padding-right: 2rem;
+}
+
+.p2-title {
+    font-family: "Orbitron", sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+}
+
+.p2-subtitle {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: #FFFFFF;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.model-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.control-btn {
+    font-family: "Space Grotesk", sans-serif;
+    background: linear-gradient(45deg, #EC4E20, #DB8A74);
+    color: #151019;
+    border: none;
+    padding: 0.7rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.control-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(236, 78, 32, 0.3);
+    background: linear-gradient(45deg, #DB8A74, #EC4E20);
+}
+
+.control-btn:active {
+    transform: translateY(0);
+}
+
+#canvas-container {
+    flex: 1;
+    max-width: 50%;
+    height: 70vh;
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(45deg, #1a1625, #151019);
+    border: 2px solid rgba(236, 78, 32, 0.2);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+}
+
+#loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #FFFFFF;
+    font-family: "Space Grotesk", sans-serif;
+    z-index: 100;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid #EC4E20;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#three-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 10px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .page2 {
+        flex-direction: column;
+        padding: 2rem 5%;
+        text-align: center;
+    }
+    
+    .p2-text-content {
+        max-width: 100%;
+        padding-right: 0;
+        margin-bottom: 2rem;
+    }
+    
+    #canvas-container {
+        max-width: 100%;
+        height: 50vh;
+    }
+    
+    .p2-title {
+        font-size: 2rem;
+    }
+}

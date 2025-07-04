@@ -1,9 +1,32 @@
 {% extends "dashboard_template.html" %}
-
-{% set active_page = 'visual_oversight' %}
+{% set active_page = 'visual_view' %}
 
 {% block main_dashboard_content %}
-<div class="video-placeholder">
-    MAIN AREA - Visual Oversight (3D Digital Twin Placeholder)
+
+
+<div class="visual-container">
+    <!-- 3D Model View Section -->
+    <div class="visual-model-view">
+        <div class="model-controls-wrapper">
+            <div class="model-controls">
+                <button class="control-btn" id="resetVisualView">Reset View</button>
+                <button class="control-btn" id="toggleVisualWireframe">Wireframe</button>
+                <button class="control-btn" id="toggleVisualAnimation">Animation</button>
+            </div>
+        </div>
+        <div id="visual-canvas-container">
+            <div id="visual-loading-spinner">
+                <div class="spinner"></div>
+                <span>Loading 3D Model...</span>
+            </div>
+            <!-- 3D Canvas will be injected here -->
+        </div>
+    </div>
 </div>
+
+<!-- Three.js Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard_visual.js') }}"></script>
 {% endblock main_dashboard_content %}

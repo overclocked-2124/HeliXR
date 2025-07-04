@@ -346,7 +346,15 @@ def latest_sensor_data():
                     "valve_3": servo_data.get("servo_3", 0),
                     "valve_4": servo_data.get("servo_4", 0),
                     "valve_5": servo_data.get("servo_5", 0)
-                }
+                },
+                "thresholds": {
+                "temp_threshold": 30,
+                "humidity_threshold": 70,
+                "ph_threshold": 8.5,
+                "ph_min": 6.5,
+                "color_diff_threshold": 50
+            }
+
             })
         else:
             current_app.logger.warning("⚠️ No documents found in collection")
